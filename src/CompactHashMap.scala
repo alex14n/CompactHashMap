@@ -65,7 +65,7 @@ class CompactHashMap[K,V] (
 
   /** Array with this map's values.
    */
-  final private[this] var myValues = emptyArray.asInstanceOf[Array[V]]
+  final private[this] var myValues: Array[V] = null
 
   /** Is the given key mapped to a value by this map?
    *
@@ -234,12 +234,10 @@ class CompactHashMap[K,V] (
    *  @return  the elements of this map satisfying <code>p</code>.
    */
   override def filter (p: ((K,V)) => Boolean) = {
-    var newValues = emptyArray.asInstanceOf[Array[V]]
+    var newValues: Array[V] = null
     val newKeys = myKeys.filter (
-      (k,i) => p(k,myValues(i)),
-      bits => newValues = if (bits < 0)
-        emptyArray.asInstanceOf[Array[V]]
-        else newArray (valueClass, 1 << bits),
+      (k,i) => p(k, myValues(i)),
+      bits => if (bits >= 0) newValues = newArray (valueClass, 1 << bits),
       (i,j) => newValues(i) = myValues(j)
     )
     new CompactHashMap (newKeys, newValues, valueClass)

@@ -156,7 +156,8 @@ private abstract class FixedHashSet[T] (
 
   /** Cache array length as local variable
    */
-  final private[this] val arrayLength = array.length
+  final private[this] val arrayLength =
+    if (array eq null) 0 else array.length
 
   /** Objects original (full) hash codes.
    */
@@ -448,15 +449,11 @@ private final object FixedHashSet {
 
   class ResizeNeeded extends Exception
 
-  /** The empty array to use.
-   */
-  final val emptyArray = boxArray(new Array[Any](0))
-
   /** Create new array to hold set or map elements.
    */
   final def newArray[V] (valueClass: Class[V], size: Int): Array[V] = (
     // empty array if class is undefined
-    if (size <= 0 || (valueClass eq null)) emptyArray
+    if (size <= 0 || (valueClass eq null)) null
     // primitive types
     else if (valueClass.isPrimitive)
       boxArray(createArray(valueClass,size))
