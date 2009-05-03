@@ -312,7 +312,7 @@ private abstract class FixedHashSet[T] (
     }
     // Now we can allocate set with exact size.
     if (count == 0) {
-      if (null ne newCallback) newCallback (0)
+      if (null ne newCallback) newCallback (-1)
       emptyHashSet.asInstanceOf[FixedHashSet[T]]
     } else {
       val c = FixedHashSet (newBits, elemClass)

@@ -237,7 +237,9 @@ class CompactHashMap[K,V] (
     var newValues = emptyArray.asInstanceOf[Array[V]]
     val newKeys = myKeys.filter (
       (k,i) => p(k,myValues(i)),
-      bits => newValues = newArray (valueClass, 1 << bits),
+      bits => newValues = if (bits < 0)
+        emptyArray.asInstanceOf[Array[V]]
+        else newArray (valueClass, 1 << bits),
       (i,j) => newValues(i) = myValues(j)
     )
     new CompactHashMap (newKeys, newValues, valueClass)
