@@ -136,7 +136,7 @@ private abstract class FixedHashSet[T] (
    *  in array with the same hash code.
    *
    *  Non-negative values are indices of the next element,
-   *  -1 )default) is empty spot (or end of deleted list),
+   *  -1 (default) is empty spot (or end of deleted list),
    *  -2 is 'end of list',
    *  other negative values are indices of next deleted element.
    */
