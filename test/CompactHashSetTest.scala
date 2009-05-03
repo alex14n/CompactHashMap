@@ -10,7 +10,7 @@ class CompactHashSetTest {
       assertFalse (set.contains(i))
       val size0 = set.size
       set += i
-      assertEquals (set.size, size0+1)
+      assertEquals (size0+1, set.size)
       assertTrue (set.contains(i))
       for (j <- i+1 to 200) assertFalse (set.contains(j))
     }
@@ -18,7 +18,7 @@ class CompactHashSetTest {
 
   @Test def testNull {
     val set = new CompactHashSet[String]()
-    assertTrue (set.size == 0)
+    assertEquals (0, set.size)
 
     assertFalse (set.contains("test"))
     set += "test"
@@ -31,16 +31,16 @@ class CompactHashSetTest {
 
   @Test def testElements {
     val set = new CompactHashSet(classOf[Int])
-    assertEquals (set.elements.toList, Nil)
+    assertEquals (Nil, set.elements.toList)
     set += 1
-    assertEquals (set.elements.toList, List(1))
+    assertEquals (List(1), set.elements.toList)
     set += 2
     set += 3
     val set2 = Set() ++ set.elements
-    assertEquals (set2, Set(1,2,3))
+    assertEquals (Set(1,2,3), set2)
     set += 0
     val set3 = Set() ++ set.elements
-    assertEquals (set3, Set(0,1,2,3))
+    assertEquals (Set(0,1,2,3), set3)
   }
 
   @Test def testFixedDel {
@@ -95,7 +95,7 @@ class CompactHashSetTest {
     assertTrue (set.isEmpty(2))
     assertTrue (set.isEmpty(3))
 
-    assertEquals (set.elements.toList, Nil)
+    assertEquals (Nil, set.elements.toList)
 
     assertEquals (2, set.add(10))
     // assertEquals (0, set.firstDeletedIndex)
@@ -106,14 +106,14 @@ class CompactHashSetTest {
     assertEquals (3, set.add(13))
 
     val set2 = Set() ++ set.elements
-    assertEquals (set2, Set(10,11,12,13))
+    assertEquals (Set(10,11,12,13), set2)
 
     set.del(11)
     // assertEquals (0, set.firstDeletedIndex)
     set.del(12)
     // assertEquals (1, set.firstDeletedIndex)
     val set3 = Set() ++ set.elements
-    assertEquals (set3, Set(10,13))
+    assertEquals (Set(10,13), set3)
     assertEquals (1, set.add(12))
     assertEquals (0, set.add(11))
   }
@@ -123,7 +123,7 @@ class CompactHashSetTest {
     for (i <- 0 to 3) set.add(i)
     set.clear
     for (i <- 11 to 14) set.add(i)
-    assertEquals (set.toList, List(11,12,13,14))
+    assertEquals (List(11,12,13,14), set.toList)
   }
 
   @Test def testFixedDel3 {
@@ -132,7 +132,7 @@ class CompactHashSetTest {
     for (i <- 4 until(0,-1)) set.del(i)
     assertEquals (0, set.size)
     for (i <- 11 to 14) set.add(i)
-    assertEquals (set.toList, List(11,12,13,14))
+    assertEquals (List(11,12,13,14), set.toList)
   }
 
   @Test def testObject {
