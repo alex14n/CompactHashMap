@@ -300,7 +300,7 @@ private abstract class FixedHashSet[T] (
     // count, and store test results in a bit set.
     val bitSet = new Array[Long] (1 max (arrayLength >>> 6))
     var count = 0
-    var newBits = 0
+    var newBits = 4 // at least we should have 16 elements
     var i = 0
     while (i < firstEmptyIndex) {
       if (!isEmpty(i) && p(array(i),i)) {
@@ -315,7 +315,6 @@ private abstract class FixedHashSet[T] (
       if (null ne newCallback) newCallback (0)
       emptyHashSet.asInstanceOf[FixedHashSet[T]]
     } else {
-      if (newBits < 4) newBits = 4 // at least we should have 16 elements
       val c = FixedHashSet (newBits, elemClass)
       if (null ne newCallback) newCallback (newBits)
       i = 0
