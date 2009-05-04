@@ -114,7 +114,7 @@ class CompactHashMap[K,V] (
    */
   override def clear {
     myKeys.clear
-    var i = myValues.length
+    var i = if (myValues eq null) 0 else myValues.length
     while (i > 0) {
       i -= 1
       myValues(i) = null.asInstanceOf[V]

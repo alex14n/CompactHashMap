@@ -32,6 +32,8 @@ class CompactHashMapTest {
 
   @Test def testNull {
     val map = new CompactHashMap [String,String] ()
+    map.clear
+
     assertEquals ("else", map.getOrElse(null, "else"))
     map update (null, "null")
     assertEquals ("null", map.getOrElse(null, "else"))
