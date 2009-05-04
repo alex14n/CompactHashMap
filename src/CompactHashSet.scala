@@ -51,7 +51,7 @@ extends scala.collection.mutable.Set[T] {
 
   /** Array to hold this set elements.
    */
-  private[this] var fixedSet = emptyHashSet.asInstanceOf[FixedHashSet[T]]
+  private[this] var fixedSet = EmptyHashSet.asInstanceOf[FixedHashSet[T]]
 
   /** Check if this set contains element <code>elem</code>.
    *
@@ -65,7 +65,7 @@ extends scala.collection.mutable.Set[T] {
    *  @param  elem  the element to be added
    */
   def += (elem: T): Unit = try {
-    fixedSet.add(elem)
+    fixedSet.add (elem)
   } catch {
     case e: ResizeNeeded =>
       val newFixedSet = FixedHashSet (
@@ -97,7 +97,7 @@ extends scala.collection.mutable.Set[T] {
    *
    *  @param  elem  The element to be removed.
    */
-  def -= (elem: T) { fixedSet.del(elem) }
+  def -= (elem: T) { fixedSet.delete (elem) }
 
   /** Return a clone of this set.
    *
@@ -188,12 +188,12 @@ private abstract class FixedHashSet[T] (
   final def getArray = array
 
   /** Hash code of given element.
-   */
   private[this] final def hashIndex (elem: T) = {
     var h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
     h ^= (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4)
     h & (arrayLength - 1)
   }
+   */
 
   /** Return index of given element in this set's array.
    *  Negative values means that there is no such element.
@@ -314,7 +314,7 @@ private abstract class FixedHashSet[T] (
     // Now we can allocate set with exact size.
     if (count == 0) {
       if (null ne newCallback) newCallback (-1)
-      emptyHashSet.asInstanceOf[FixedHashSet[T]]
+      EmptyHashSet.asInstanceOf[FixedHashSet[T]]
     } else {
       val c = FixedHashSet (newBits, elemClass)
       if (null ne newCallback) newCallback (newBits)
@@ -357,9 +357,10 @@ private abstract class FixedHashSet[T] (
    * @return  index of deleted element in array
    *          or negative values if it was not present in set.
    */
-  final def del (elem: T) = {
-    val hi = hashIndex (elem)
-    val i0 = firstIndex (hi)
+  final def delete (elem: T) = {
+    var h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
+    h = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (arrayLength - 1)
+    val i0 = firstIndex (h)
     var i = i0
     var prev = -1
     while (i >= 0 && array(i) != elem) {
@@ -373,7 +374,7 @@ private abstract class FixedHashSet[T] (
 
       if (i0 == i) {
         var ni = nextIndex (i)
-        setFirstIndex (hi, ni)
+        setFirstIndex (h, ni)
       } else
       if (prev >= 0) setNextIndex(prev, nextIndex(i))
 
@@ -606,8 +607,8 @@ private final object FixedHashSet {
   /** Empty FixedHashSet implementation.
    */
   @serializable
-  final class EmptyHashSet[T] extends FixedHashSet[T] (3, null) {
-    final def positionOf (elem: T) = -1
+  final object EmptyHashSet extends FixedHashSet[Any] (3, null) {
+    final def positionOf (elem: Any) = -1
     final def isEmpty (i: Int) = true
     protected final def firstIndex (i: Int) = -1
     protected final def nextIndex (i: Int) = -1
@@ -615,15 +616,11 @@ private final object FixedHashSet {
     protected final def setNextIndex (i: Int, v: Int) { }
   }
 
-  /** The empty FixedHashSet implementation object.
-   */
-  final val emptyHashSet = new EmptyHashSet[Nothing]
-
   /** Construct FixedHashSet implementation with given parameters.
    */
   final def apply[T] (bits: Int, elemClass: Class[T]): FixedHashSet[T] =
     if (bits <= 0 || (elemClass eq null))
-      emptyHashSet.asInstanceOf[FixedHashSet[T]] else
+      EmptyHashSet.asInstanceOf[FixedHashSet[T]] else
     if (bits <  8) new ByteHashSet (bits, elemClass) else
     if (bits < 16) new ShortHashSet (bits, elemClass) else
     new IntHashSet (bits, elemClass)

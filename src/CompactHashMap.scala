@@ -61,7 +61,7 @@ class CompactHashMap[K,V] (
 
   /** FixedHashSet with this map's keys.
    */
-  final private[this] var myKeys = emptyHashSet.asInstanceOf[FixedHashSet[K]]
+  final private[this] var myKeys = EmptyHashSet.asInstanceOf[FixedHashSet[K]]
 
   /** Array with this map's values.
    */
@@ -105,6 +105,14 @@ class CompactHashMap[K,V] (
     if (i >= 0) myValues(i) else default
   }
 
+  /** Check if this map maps <code>key</code> to a value.
+    *  Return that value if it exists, otherwise return <code>default</code>.
+    */
+  def getOrElseV[V2 >: V] (key: K, default: V2): V2 = {
+    val i = myKeys.positionOf(key)
+    if (i >= 0) myValues(i) else default
+  }
+
   /** Returns the size of this hash map.
    */
   def size = myKeys.size
@@ -114,10 +122,12 @@ class CompactHashMap[K,V] (
    */
   override def clear {
     myKeys.clear
-    var i = if (myValues eq null) 0 else myValues.length
-    while (i > 0) {
-      i -= 1
-      myValues(i) = null.asInstanceOf[V]
+    if (myValues ne null) {
+      var i = myValues.length
+      while (i > 0) {
+        i -= 1
+        myValues(i) = null.asInstanceOf[V]
+      }
     }
   }
 
@@ -188,7 +198,7 @@ class CompactHashMap[K,V] (
    *  @param  key  the key to be removed
    */
   def -= (key: K) {
-    val i = myKeys.del(key)
+    val i = myKeys.delete (key)
     if (i >= 0) myValues(i) = null.asInstanceOf[V]
   }
 
