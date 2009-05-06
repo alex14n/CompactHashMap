@@ -131,6 +131,28 @@ class CompactHashMap[K,V] (
     }
   }
 
+  /** Resize map.
+   */
+  private[this] def resize (key: K, value: V) {
+    // determine keys and values classes by first inserted objects
+    // if they were not specified during map creation
+    if (keyClass eq null)
+      keyClass = (
+        if (key.asInstanceOf[Object] eq null) classOf[Object]
+        else key.asInstanceOf[Object].getClass
+      ).asInstanceOf[Class[K]]
+    if (valueClass eq null) valueClass = (
+      if (value.asInstanceOf[Object] eq null) classOf[Object]
+      else value.asInstanceOf[Object].getClass
+    ).asInstanceOf[Class[V]]
+    //
+    val newKeys = FixedHashSet (myKeys.bits + 1, keyClass)
+    val newValues = newArray (valueClass, newKeys.capacity)
+    myKeys.copyTo (newKeys, (i,j) => newValues(i) = myValues(j))
+    myKeys = newKeys
+    myValues = newValues
+  }
+
   /** This method allows one to add a new mapping from <code>key</code>
    *  to <code>value</code> to the map. If the map already contains a
    *  mapping for <code>key</code>, it will be overridden by this
@@ -139,35 +161,16 @@ class CompactHashMap[K,V] (
    * @param  key    The key to update
    * @param  value  The new value
    */
-  def update (key: K, value: V) {
-    val i = myKeys.positionOf(key)
-    if (i >= 0) myValues(i) = value else
-      try {
-        val i2 = myKeys.add(key)
+  def update (key: K, value: V) =
+    try {
+      val i = myKeys.add (key)
+      myValues(i) = value
+    } catch {
+      case e: ResizeNeeded =>
+        resize (key, value)
+        val i2 = myKeys.addNew (key)
         myValues(i2) = value
-      } catch {
-        case e: ResizeNeeded =>
-          // determine elements class by first inserted object
-          // if it was not specified during map creation
-          if (keyClass eq null)
-            keyClass = (
-              if (key.asInstanceOf[Object] eq null) classOf[Object]
-              else key.asInstanceOf[Object].getClass
-            ).asInstanceOf[Class[K]]
-          if (valueClass eq null) valueClass = (
-            if (value.asInstanceOf[Object] eq null) classOf[Object]
-            else value.asInstanceOf[Object].getClass
-          ).asInstanceOf[Class[V]]
-          //
-          val newKeys = FixedHashSet(myKeys.bits + 1, keyClass)
-          val newValues = newArray (valueClass, newKeys.capacity)
-          myKeys.copyTo(newKeys, (i,j) => newValues(i) = myValues(j))
-          myKeys = newKeys
-          myValues = newValues
-          val i2 = myKeys.add(key)
-          myValues(i2) = value
-      }
-  }
+    }
 
   /** Insert new key-value mapping or update existing with given function.
    *
@@ -178,7 +181,18 @@ class CompactHashMap[K,V] (
   def insertOrUpdate (key: K, newValue: => V, updateFunction: V => V) {
     val i = myKeys.positionOf(key)
     if (i >= 0) myValues(i) = updateFunction (myValues(i))
-    else update (key, newValue)
+    else {
+      val newV = newValue
+      try {
+        val j = myKeys.addNew (key)
+        myValues(j) = newV
+      } catch {
+        case e: ResizeNeeded =>
+          resize (key, newV)
+          val j = myKeys.addNew (key)
+          myValues(j) = newV
+      }
+    }
   }
 
   /** Insert new key-value mapping or update existing with given function.
@@ -190,7 +204,38 @@ class CompactHashMap[K,V] (
   def insertOrUpdateF (key: K, newValue: () => V, updateFunction: V => V) {
     val i = myKeys.positionOf(key)
     if (i >= 0) myValues(i) = updateFunction (myValues(i))
-    else update (key, newValue())
+    else {
+      val newV = newValue ()
+      try {
+        val j = myKeys.addNew (key)
+        myValues(j) = newV
+      } catch {
+        case e: ResizeNeeded =>
+          resize (key, newV)
+          val j = myKeys.addNew (key)
+          myValues(j) = newV
+      }
+    }
+  }
+
+  /** Insert new key-value mapping or update existing with given function.
+   *
+   * @param  key  The key to update
+   * @param  newValue  Function to get new value
+   * @param  updateFunction  Function to apply to existing value
+   */
+  def insertOrUpdateV (key: K, newValue: V, updateFunction: V => V) {
+    val i = myKeys.positionOf(key)
+    if (i >= 0) myValues(i) = updateFunction (myValues(i))
+    else try {
+      val j = myKeys.addNew (key)
+      myValues(j) = newValue
+    } catch {
+      case e: ResizeNeeded =>
+        resize (key, newValue)
+        val j = myKeys.addNew (key)
+        myValues(j) = newValue
+    }
   }
 
   /** Remove a key from this map, noop if key is not present.

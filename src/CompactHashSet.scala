@@ -159,10 +159,6 @@ private abstract class FixedHashSet[T] (
   final private[this] val arrayLength =
     if (array eq null) 0 else array.length
 
-  /** Objects original (full) hash codes.
-   */
-  // final val hashCodes = new Array[Int] (arrayLength);
-
   /** Number of elements in this set
    */
   final private[this] var counter = 0
@@ -217,7 +213,7 @@ private abstract class FixedHashSet[T] (
   private[this] final def findEmptySpot =
     if (firstDeletedIndex >= 0) {
       val i = firstDeletedIndex
-      firstDeletedIndex = nextIndex(firstDeletedIndex)
+      firstDeletedIndex = nextIndex (firstDeletedIndex)
       if (firstDeletedIndex < -2) firstDeletedIndex = -3-firstDeletedIndex
       i
     } else firstEmptyIndex
@@ -225,39 +221,25 @@ private abstract class FixedHashSet[T] (
   /** Adds element to set.
    *  Throws ResizeNeeded if set is full.
    */
-  final def add (elem: T) =
-    if (counter >= arrayLength)
-      throw new ResizeNeeded
-    else {
-      // (inline hashCode) position in firstIndex table
-      val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
-      var i = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (arrayLength - 1)
-      var j = firstIndex (i)
-      // there already is element(s) with this hash
-      if (j >= 0) {
-        var found = array(j) == elem
-        while (!found && nextIndex(j) >= 0) {
-          j = nextIndex(j)
-          found = array(j) == elem
-        }
-        // This element already present in set?
-        if (found) j else {
-          // FirstIndex array is already set,
-          // add element into NextIndex linked list
-          val newIndex = findEmptySpot
-          setNextIndex (j, newIndex)
-          setNextIndex (newIndex, -2) // Mark as 'set', default -1 means 'empty'
-          array(newIndex) = elem
-          // hashCodes(newIndex) = h
-          counter += 1
-          if (newIndex == firstEmptyIndex) firstEmptyIndex += 1
-          newIndex
-        }
-      } else {
-        // this is the first elemens with that hash code,
-        // insert it into FirstIndex array
+  final def add (elem: T) = {
+    // (inline hashCode) position in firstIndex table
+    val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
+    var i = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (arrayLength - 1)
+    var j = firstIndex (i)
+    // there already is element(s) with this hash
+    if (j >= 0) {
+      var found = array(j) == elem
+      while (!found && nextIndex(j) >= 0) {
+        j = nextIndex(j)
+        found = array(j) == elem
+      }
+      // This element already present in set?
+      if (found) j else {
+        if (counter >= arrayLength) throw new ResizeNeeded
+        // FirstIndex array is already set,
+        // add element into NextIndex linked list
         val newIndex = findEmptySpot
-        setFirstIndex (i, newIndex)
+        setNextIndex (j, newIndex)
         setNextIndex (newIndex, -2) // Mark as 'set', default -1 means 'empty'
         array(newIndex) = elem
         // hashCodes(newIndex) = h
@@ -265,6 +247,38 @@ private abstract class FixedHashSet[T] (
         if (newIndex == firstEmptyIndex) firstEmptyIndex += 1
         newIndex
       }
+    } else {
+      if (counter >= arrayLength) throw new ResizeNeeded
+      // this is the first elemens with that hash code,
+      // insert it into FirstIndex array
+      val newIndex = findEmptySpot
+      setFirstIndex (i, newIndex)
+      setNextIndex (newIndex, -2) // Mark as 'set', default -1 means 'empty'
+      array(newIndex) = elem
+      // hashCodes(newIndex) = h
+      counter += 1
+      if (newIndex == firstEmptyIndex) firstEmptyIndex += 1
+      newIndex
+    }
+  }
+
+  /** Adds element to set that does not already exist in this set.
+   *  Throws ResizeNeeded if set is full.
+   */
+  final def addNew (elem: T) =
+    if (firstEmptyIndex >= arrayLength)
+      throw new ResizeNeeded
+    else {
+      // (inline hashCode) position in firstIndex table
+      val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
+      var i = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (arrayLength - 1)
+      val next = firstIndex (i)
+      setFirstIndex (i, firstEmptyIndex)
+      setNextIndex (firstEmptyIndex, if (next < 0) -2 else next)
+      array(firstEmptyIndex) = elem
+      counter += 1
+      firstEmptyIndex += 1
+      firstEmptyIndex - 1
     }
 
   /** Copy all elements to another FixedHashSet.
@@ -274,10 +288,11 @@ private abstract class FixedHashSet[T] (
    *                    with its new and old indices in set's arrays.
    */
   final def copyTo (that: FixedHashSet[T], callback: (Int,Int) => Unit) {
+    // assert (that.isEmpty)
     var i = 0
     while (i < firstEmptyIndex) {
       if (!isEmpty(i)) {
-        val i2 = that.add(array(i))
+        val i2 = that.addNew (array(i))
         if (null ne callback) callback(i2, i)
       }
       i += 1
@@ -321,7 +336,7 @@ private abstract class FixedHashSet[T] (
       i = 0
       while (i < firstEmptyIndex) {
         if ((bitSet(i >>> 6) >>> (i & 63) & 1) > 0) {
-          val i2 = c.add(array(i))
+          val i2 = c.addNew (array(i))
           if (null ne copyCallback) copyCallback (i2, i)
         }
         i += 1
@@ -503,11 +518,10 @@ private final object FixedHashSet {
 
     final private[this] val len = 1 << bits
     final private[this] val localArray = getArray // scalac treat 'array' as method call :-(
-    // final private[this] val localHashCodes = hashCodes
     final def positionOf (elem: T) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       var i = -1-indexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len-1))
-      while (i >= 0 /* && localHashCodes(i) != h */ && {
+      while (i >= 0 && {
         val x = localArray(i)
         (x.asInstanceOf[Object] ne elem.asInstanceOf[Object]) && x != elem
       })
@@ -543,11 +557,10 @@ private final object FixedHashSet {
 
     final private[this] val len = 1 << bits
     final private[this] val localArray = getArray
-    // final private[this] val localHashCodes = hashCodes
     final def positionOf (elem: T) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       var i = -1-indexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len-1))
-      while (i >= 0 /* && localHashCodes(i) != h */ && {
+      while (i >= 0 && {
         val x = localArray(i)
         (x.asInstanceOf[Object] ne elem.asInstanceOf[Object]) && x != elem
       })
@@ -581,11 +594,10 @@ private final object FixedHashSet {
 
     final private[this] val len = 1 << bits
     final private[this] val localArray = getArray
-    // final private[this] val localHashCodes = hashCodes
     final def positionOf (elem: T) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       var i = -1-indexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len-1))
-      while (i >= 0 /* && localHashCodes(i) != h */ && {
+      while (i >= 0 && {
         val x = localArray(i)
         (x.asInstanceOf[Object] ne elem.asInstanceOf[Object]) && x != elem
       })
