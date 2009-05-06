@@ -356,15 +356,14 @@ private abstract class FixedHashSet[T] (
   /** Removes all elements from the set.
    */
   def clear {
-    counter = 0
-    firstEmptyIndex = 0
-    firstDeletedIndex = -1
-
     var i = firstEmptyIndex
     while (i > 0) {
       i -= 1
       array(i) = null.asInstanceOf[T]
     }
+    counter = 0
+    firstEmptyIndex = 0
+    firstDeletedIndex = -1
   }
 
   /** Delete element from set.
@@ -517,7 +516,9 @@ private final object FixedHashSet {
     // 'inline' some methods for better performance
 
     final private[this] val len = 1 << bits
-    final private[this] val localArray = getArray // scalac treat 'array' as method call :-(
+    // scalac treat 'array' as method call :-(
+    // until it's private[this] so make a local copy
+    final private[this] val localArray = getArray
     final def positionOf (elem: T) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       var i = -1-indexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len-1))

@@ -278,7 +278,7 @@ class CompactHashMap[K,V] (
   override def clone = {
     val newKeys = FixedHashSet (myKeys.bits, keyClass)
     val newValues = newArray (valueClass, newKeys.capacity)
-    myKeys.copyTo(newKeys, (i,j) => newValues(i) = myValues(j))
+    myKeys.copyTo (newKeys, (i,j) => newValues(i) = myValues(j))
     new CompactHashMap (newKeys, newValues, valueClass)
   }
 
