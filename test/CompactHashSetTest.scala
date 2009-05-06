@@ -149,4 +149,15 @@ class CompactHashSetTest {
     assertEquals (6, set1.bits)
     assertEquals ((0 until (201,4)).toList, set1.toList)
   }
+
+  @Test def testClear {
+    val elements = List ("1", "2", "test", "14", "0", null, "77")
+    val set = FixedHashSet (4, classOf[String])
+    elements foreach { x => set addNew x }
+    assertEquals (elements, set.toList)
+    set.clear
+    assertTrue (set.isEmpty)
+    val array = set.getArray
+    array foreach { x => assertEquals (null, x) }
+  }
 }
