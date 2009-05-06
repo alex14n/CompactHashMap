@@ -316,7 +316,7 @@ private abstract class FixedHashSet[T] (
     // count, and store test results in a bit set.
     val bitSet = new Array[Long] (1 max (arrayLength >>> 6))
     var count = 0
-    var newBits = 4 // at least we should have 16 elements
+    var newBits = initialBits
     var i = 0
     while (i < firstEmptyIndex) {
       if (!isEmpty(i) && p(array(i),i)) {
@@ -462,7 +462,9 @@ import java.util.Arrays.fill
  */
 private final object FixedHashSet {
 
-  class ResizeNeeded extends Exception
+  final class ResizeNeeded extends Exception
+
+  final val initialBits = 2 // 4 elements
 
   /** Create new array to hold set or map elements.
    */
@@ -614,7 +616,7 @@ private final object FixedHashSet {
   /** Empty FixedHashSet implementation.
    */
   @serializable
-  final object EmptyHashSet extends FixedHashSet[Any] (3, null) {
+  final object EmptyHashSet extends FixedHashSet[Any] (initialBits - 1, null) {
     final def positionOf (elem: Any) = -1
     final def isEmpty (i: Int) = true
     protected final def firstIndex (i: Int) = -1
