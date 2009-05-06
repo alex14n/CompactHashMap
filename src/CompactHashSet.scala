@@ -484,40 +484,38 @@ private final object FixedHashSet {
   @serializable
   final class ByteHashSet[T] (bits: Int, elemClass: Class[T])
   extends FixedHashSet[T] (bits, elemClass) {
-    private[this] final val firstIndexTable = new Array[Byte] (1 << bits)
-    private[this] final val nextIndexTable = new Array[Byte] (1 << bits)
+    private[this] final val indexTable = new Array[Byte] (2 << bits)
 
     // make -1 default instead of 0
-    protected final def firstIndex (i: Int) = -1-firstIndexTable(i)
-    protected final def nextIndex (i: Int) = -1-nextIndexTable(i)
+    protected final def firstIndex (i: Int) = -1-indexTable(i)
+    protected final def nextIndex (i: Int) = -1-indexTable(len+i)
     protected final def setFirstIndex (i: Int, v: Int) =
-      firstIndexTable(i) = (-1-v).asInstanceOf[Byte]
+      indexTable(i) = (-1-v).asInstanceOf[Byte]
     protected final def setNextIndex (i: Int, v: Int) =
-      nextIndexTable(i) = (-1-v).asInstanceOf[Byte]
+      indexTable(len+i) = (-1-v).asInstanceOf[Byte]
 
     final override def clear {
       super.clear
-      fill(firstIndexTable, 0.asInstanceOf[Byte])
-      fill(nextIndexTable, 0.asInstanceOf[Byte])
+      fill(indexTable, 0.asInstanceOf[Byte])
     }
 
     // 'inline' some methods for better performance
 
-    final private[this] val mask = (1 << bits) - 1
+    final private[this] val len = 1 << bits
     final private[this] val localArray = getArray // scalac treat 'array' as method call :-(
     // final private[this] val localHashCodes = hashCodes
     final def positionOf (elem: T) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
-      var i = -1-firstIndexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & mask)
+      var i = -1-indexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len-1))
       while (i >= 0 /* && localHashCodes(i) != h */ && {
         val x = localArray(i)
         (x.asInstanceOf[Object] ne elem.asInstanceOf[Object]) && x != elem
       })
-        i = -1-nextIndexTable(i)
+        i = -1-indexTable(len+i)
       i
     }
     final def isEmpty (i: Int) = {
-      val next = nextIndexTable(i)
+      val next = indexTable(len+i)
       next == 0 || next > 1
     }
   }
@@ -527,39 +525,37 @@ private final object FixedHashSet {
   @serializable
   final class ShortHashSet[T] (bits: Int, elemClass: Class[T])
   extends FixedHashSet[T] (bits, elemClass) {
-    private[this] final val firstIndexTable = new Array[Short] (1 << bits)
-    private[this] final val nextIndexTable = new Array[Short] (1 << bits)
+    private[this] final val indexTable = new Array[Short] (2 << bits)
 
-    protected final def firstIndex (i: Int) = -1-firstIndexTable(i)
-    protected final def nextIndex (i: Int) = -1-nextIndexTable(i)
+    protected final def firstIndex (i: Int) = -1-indexTable(i)
+    protected final def nextIndex (i: Int) = -1-indexTable(len+i)
     protected final def setFirstIndex (i: Int, v: Int) =
-      firstIndexTable(i) = (-1-v).asInstanceOf[Short]
+      indexTable(i) = (-1-v).asInstanceOf[Short]
     protected final def setNextIndex (i: Int, v: Int) =
-      nextIndexTable(i) = (-1-v).asInstanceOf[Short]
+      indexTable(len+i) = (-1-v).asInstanceOf[Short]
 
     final override def clear {
       super.clear
-      fill(firstIndexTable, 0.asInstanceOf[Short])
-      fill(nextIndexTable, 0.asInstanceOf[Short])
+      fill(indexTable, 0.asInstanceOf[Short])
     }
 
     // 'inline' some methods for better performance
 
-    final private[this] val mask = (1 << bits) - 1
+    final private[this] val len = 1 << bits
     final private[this] val localArray = getArray
     // final private[this] val localHashCodes = hashCodes
     final def positionOf (elem: T) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
-      var i = -1-firstIndexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & mask)
+      var i = -1-indexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len-1))
       while (i >= 0 /* && localHashCodes(i) != h */ && {
         val x = localArray(i)
         (x.asInstanceOf[Object] ne elem.asInstanceOf[Object]) && x != elem
       })
-        i = -1-nextIndexTable(i)
+        i = -1-indexTable(len+i)
       i
     }
     final def isEmpty (i: Int) = {
-      val next = nextIndexTable(i)
+      val next = indexTable(len+i)
       next == 0 || next > 1
     }
   }
@@ -569,37 +565,35 @@ private final object FixedHashSet {
   @serializable
   final class IntHashSet[T] (bits: Int, elemClass: Class[T])
   extends FixedHashSet[T] (bits, elemClass) {
-    private[this] final val firstIndexTable = new Array[Int] (1 << bits)
-    private[this] final val nextIndexTable = new Array[Int] (1 << bits)
+    private[this] final val indexTable = new Array[Int] (2 << bits)
 
-    protected final def firstIndex (i: Int) = -1-firstIndexTable(i)
-    protected final def nextIndex (i: Int) = -1-nextIndexTable(i)
-    protected final def setFirstIndex (i: Int, v: Int) = firstIndexTable(i) = -1-v
-    protected final def setNextIndex (i: Int, v: Int) = nextIndexTable(i) = -1-v
+    protected final def firstIndex (i: Int) = -1-indexTable(i)
+    protected final def nextIndex (i: Int) = -1-indexTable(len+i)
+    protected final def setFirstIndex (i: Int, v: Int) = indexTable(i) = -1-v
+    protected final def setNextIndex (i: Int, v: Int) = indexTable(len+i) = -1-v
 
     final override def clear {
       super.clear
-      fill(firstIndexTable, 0)
-      fill(nextIndexTable, 0)
+      fill(indexTable, 0)
     }
 
     // 'inline' some methods for better performance
 
-    final private[this] val mask = (1 << bits) - 1
+    final private[this] val len = 1 << bits
     final private[this] val localArray = getArray
     // final private[this] val localHashCodes = hashCodes
     final def positionOf (elem: T) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
-      var i = -1-firstIndexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & mask)
+      var i = -1-indexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len-1))
       while (i >= 0 /* && localHashCodes(i) != h */ && {
         val x = localArray(i)
         (x.asInstanceOf[Object] ne elem.asInstanceOf[Object]) && x != elem
       })
-        i = -1-nextIndexTable(i)
+        i = -1-indexTable(len+i)
       i
     }
     final def isEmpty (i: Int) = {
-      val next = nextIndexTable(i)
+      val next = indexTable(len+i)
       next == 0 || next > 1
     }
   }
