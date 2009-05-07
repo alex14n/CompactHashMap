@@ -314,4 +314,13 @@ class CompactHashMap[K,V] (
     )
     new CompactHashMap (newKeys, newValues, valueClass)
   }
+
+  /** Converts this map to a fresh Array with elements.
+    */
+  def toArray = {
+    val a = new Array[(K,V)] (myKeys.size)
+    var i = 0
+    elements foreach { x => a{i} = x; i += 1 }
+    a
+  }
 }

@@ -145,4 +145,12 @@ class CompactHashMapTest {
     assertEquals (map.toList, map0.toList)
     assertEquals (map, map0)
   }
+
+  @Test def testToArray {
+    val array = Array (1 -> 14, 7 -> 2, 5 -> 1, 20 -> 200)
+    val map = CompactHashMap (array: _*)
+    val a2 = map.toArray
+    assertEquals (array.size, a2.size)
+    for (i <- 0 until array.length) assertEquals (array(i), a2(i))
+  }
 }
