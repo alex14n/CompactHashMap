@@ -290,13 +290,20 @@ private abstract class FixedHashSet[T] (
   final def copyTo (that: FixedHashSet[T], callback: (Int,Int) => Unit) {
     // assert (that.isEmpty)
     var i = 0
-    while (i < firstEmptyIndex) {
-      if (!isEmpty(i)) {
+    if (firstDeletedIndex < 0)
+      while (i < firstEmptyIndex) {
         val i2 = that.addNew (array(i))
         if (null ne callback) callback(i2, i)
+        i += 1
       }
-      i += 1
-    }
+    else
+      while (i < firstEmptyIndex) {
+        if (!isEmpty(i)) {
+          val i2 = that.addNew (array(i))
+          if (null ne callback) callback(i2, i)
+        }
+        i += 1
+      }
   }
 
   /** Make copy of this set filtered by predicate.
