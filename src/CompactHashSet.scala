@@ -125,7 +125,8 @@ extends scala.collection.mutable.Set[T] {
 @serializable
 private abstract class FixedHashSet[T] (
   final val bits: Int,
-  final val elemClass: Class[T]
+  final val elemClass: Class[T],
+  a: Array[T]
 ) extends scala.collection.Set[T] {
 
   /** Index of the first element in array with given hash.
@@ -152,7 +153,7 @@ private abstract class FixedHashSet[T] (
 
   /** Array with this set elements.
    */
-  final private[this] val array = newArray (elemClass, 1 << bits)
+  final private[this] val array = a
 
   /** Cache array length as local variable
    */
@@ -342,7 +343,7 @@ private abstract class FixedHashSet[T] (
       if (null ne newCallback) newCallback (newBits)
       i = 0
       while (i < firstEmptyIndex) {
-        if ((bitSet(i >>> 6) >>> (i & 63) & 1) > 0) {
+        if ((bitSet(i >>> 6) >>> (i & 63) & 1) != 0) {
           val i2 = c.addNew (array(i))
           if (null ne copyCallback) copyCallback (i2, i)
         }
@@ -499,14 +500,14 @@ private final object FixedHashSet {
     else if (valueClass == classOf[java.lang.Double])
       new BoxedDoubleArray(new Array[Double](size))
     // general array of Object types
-    else new Array[V] (size)
+    else new BoxedObjectArray(new Array[Object] (size))
   ).asInstanceOf[Array[V]]
 
   /** FixedHashSet implementation with byte-size index arrays.
    */
   @serializable
-  final class ByteHashSet[T] (bits: Int, elemClass: Class[T])
-  extends FixedHashSet[T] (bits, elemClass) {
+  final class ByteHashSet[T] (bits: Int, elemClass: Class[T], a: Array[T])
+  extends FixedHashSet[T] (bits, elemClass, a) {
     private[this] final val indexTable = new Array[Byte] (2 << bits)
 
     // make -1 default instead of 0
@@ -527,7 +528,7 @@ private final object FixedHashSet {
     final private[this] val len = 1 << bits
     // scalac treat 'array' as method call :-(
     // until it's private[this] so make a local copy
-    final private[this] val localArray = getArray
+    final private[this] val localArray = a
     final def positionOf (elem: T) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       var i = -1-indexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len-1))
@@ -547,8 +548,8 @@ private final object FixedHashSet {
   /** FixedHashSet implementation with short-size index arrays.
    */
   @serializable
-  final class ShortHashSet[T] (bits: Int, elemClass: Class[T])
-  extends FixedHashSet[T] (bits, elemClass) {
+  final class ShortHashSet[T] (bits: Int, elemClass: Class[T], a: Array[T])
+  extends FixedHashSet[T] (bits, elemClass, a) {
     private[this] final val indexTable = new Array[Short] (2 << bits)
 
     protected final def firstIndex (i: Int) = -1-indexTable(i)
@@ -566,7 +567,7 @@ private final object FixedHashSet {
     // 'inline' some methods for better performance
 
     final private[this] val len = 1 << bits
-    final private[this] val localArray = getArray
+    final private[this] val localArray = a
     final def positionOf (elem: T) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       var i = -1-indexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len-1))
@@ -586,8 +587,8 @@ private final object FixedHashSet {
   /** FixedHashSet implementation with int-size index arrays.
    */
   @serializable
-  final class IntHashSet[T] (bits: Int, elemClass: Class[T])
-  extends FixedHashSet[T] (bits, elemClass) {
+  final class IntHashSet[T] (bits: Int, elemClass: Class[T], a: Array[T])
+  extends FixedHashSet[T] (bits, elemClass, a) {
     private[this] final val indexTable = new Array[Int] (2 << bits)
 
     protected final def firstIndex (i: Int) = -1-indexTable(i)
@@ -603,7 +604,7 @@ private final object FixedHashSet {
     // 'inline' some methods for better performance
 
     final private[this] val len = 1 << bits
-    final private[this] val localArray = getArray
+    final private[this] val localArray = a
     final def positionOf (elem: T) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       var i = -1-indexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len-1))
@@ -620,10 +621,50 @@ private final object FixedHashSet {
     }
   }
 
+
+  /** FixedHashSet implementation with int-size index arrays.
+   */
+  @serializable
+  final class IntObjectHashSet[T] (bits: Int, elemClass: Class[T], a: Array[T])
+  extends FixedHashSet[T] (bits, elemClass, a) {
+    private[this] final val indexTable = new Array[Int] (2 << bits)
+
+    protected final def firstIndex (i: Int) = -1-indexTable(i)
+    protected final def nextIndex (i: Int) = -1-indexTable(len+i)
+    protected final def setFirstIndex (i: Int, v: Int) = indexTable(i) = -1-v
+    protected final def setNextIndex (i: Int, v: Int) = indexTable(len+i) = -1-v
+
+    final override def clear {
+      super.clear
+      fill(indexTable, 0)
+    }
+
+    // 'inline' some methods for better performance
+
+    final private[this] val len = 1 << bits
+    final private[this] val localArray: Array[Object] = a.asInstanceOf[BoxedObjectArray].value
+    final def positionOf (elem: T) = {
+      val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
+      var i = -1-indexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len-1))
+      while (i >= 0 && {
+        val x = localArray(i)
+        (x.asInstanceOf[Object] ne elem.asInstanceOf[Object]) &&
+          ((elem.asInstanceOf[Object] eq null) ||
+          ! (elem.asInstanceOf[Object] equals x))
+      })
+        i = -1-indexTable(len+i)
+      i
+    }
+    final def isEmpty (i: Int) = {
+      val next = indexTable(len+i)
+      next == 0 || next > 1
+    }
+  }
+
   /** Empty FixedHashSet implementation.
    */
   @serializable
-  final object EmptyHashSet extends FixedHashSet[Any] (initialBits - 1, null) {
+  final object EmptyHashSet extends FixedHashSet[Any] (initialBits - 1, null, null) {
     final def positionOf (elem: Any) = -1
     final def isEmpty (i: Int) = true
     protected final def firstIndex (i: Int) = -1
@@ -634,10 +675,18 @@ private final object FixedHashSet {
 
   /** Construct FixedHashSet implementation with given parameters.
    */
-  final def apply[T] (bits: Int, elemClass: Class[T]): FixedHashSet[T] =
+  final def apply[T] (bits: Int, elemClass: Class[T]): FixedHashSet[T] = {
     if (bits <= 0 || (elemClass eq null))
-      EmptyHashSet.asInstanceOf[FixedHashSet[T]] else
-    if (bits <  8) new ByteHashSet (bits, elemClass) else
-    if (bits < 16) new ShortHashSet (bits, elemClass) else
-    new IntHashSet (bits, elemClass)
+      EmptyHashSet.asInstanceOf[FixedHashSet[T]] else {
+      val a = newArray (elemClass, 1 << bits)
+      if (bits <  8)
+        new ByteHashSet (bits, elemClass, a) else
+      if (bits < 16)
+        new ShortHashSet (bits, elemClass, a) else
+      if (a.isInstanceOf[BoxedObjectArray])
+        new IntObjectHashSet (bits, elemClass, a)
+      else
+        new IntHashSet (bits, elemClass, a)
+    }
+  }
 }

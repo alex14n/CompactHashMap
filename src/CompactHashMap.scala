@@ -108,6 +108,14 @@ class CompactHashMap[K,V] (
   /** Check if this map maps <code>key</code> to a value.
     *  Return that value if it exists, otherwise return <code>default</code>.
     */
+  def getOrElseF[V2 >: V] (key: K, default: () => V2): V2 = {
+    val i = myKeys.positionOf(key)
+    if (i >= 0) myValues(i) else default()
+  }
+
+  /** Check if this map maps <code>key</code> to a value.
+    *  Return that value if it exists, otherwise return <code>default</code>.
+    */
   def getOrElseV[V2 >: V] (key: K, default: V2): V2 = {
     val i = myKeys.positionOf(key)
     if (i >= 0) myValues(i) else default
@@ -136,11 +144,10 @@ class CompactHashMap[K,V] (
   private[this] def resize (key: K, value: V) {
     // determine keys and values classes by first inserted objects
     // if they were not specified during map creation
-    if (keyClass eq null)
-      keyClass = (
-        if (key.asInstanceOf[Object] eq null) classOf[Object]
-        else key.asInstanceOf[Object].getClass
-      ).asInstanceOf[Class[K]]
+    if (keyClass eq null) keyClass = (
+      if (key.asInstanceOf[Object] eq null) classOf[Object]
+      else key.asInstanceOf[Object].getClass
+    ).asInstanceOf[Class[K]]
     if (valueClass eq null) valueClass = (
       if (value.asInstanceOf[Object] eq null) classOf[Object]
       else value.asInstanceOf[Object].getClass
@@ -148,7 +155,17 @@ class CompactHashMap[K,V] (
     //
     val newKeys = FixedHashSet (myKeys.bits + 1, keyClass)
     val newValues = newArray (valueClass, newKeys.capacity)
-    myKeys.copyTo (newKeys, (i,j) => newValues(i) = myValues(j))
+    // myKeys.copyTo (newKeys, (i,j) => newValues(i) = myValues(j))
+    val keysArray = myKeys.getArray
+    if (keysArray ne null) {
+      val len = keysArray.size
+      var i = 0
+      while (i < len) {
+        val j = newKeys.addNew (keysArray(i))
+        newValues(j) = myValues(i)
+        i += 1
+      }
+    }
     myKeys = newKeys
     myValues = newValues
   }

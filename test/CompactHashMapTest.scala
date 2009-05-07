@@ -133,9 +133,16 @@ class CompactHashMapTest {
   @Test def testFilter {
     val map = CompactHashMap[Int,Int]
     for (i <- 0 to 300) map update (i, i/4)
-    val map1 = map.filter {x => (x._1 & 3) == 0 && x._2 < 50}
+
+    val map1 = map.filter { x => (x._1 & 3) == 0 && x._2 < 50 }
     assertEquals ((0 until 50).map(x => (x*4,x)).toList, map1.toList)
-    val map2 = map.filter {x => false}
+
+    val map2 = map.filter { x => false }
     assertEquals (Nil, map2.toList)
+
+    val map0 = map filter { x => true }
+    assertEquals (map.size, map0.size)
+    assertEquals (map.toList, map0.toList)
+    assertEquals (map, map0)
   }
 }
