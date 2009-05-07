@@ -155,16 +155,18 @@ class CompactHashMap[K,V] (
     //
     val newKeys = FixedHashSet (myKeys.bits + 1, keyClass)
     val newValues = newArray (valueClass, newKeys.capacity)
-    // myKeys.copyTo (newKeys, (i,j) => newValues(i) = myValues(j))
     val keysArray = myKeys.getArray
     if (keysArray ne null) {
       val len = keysArray.size
-      var i = 0
-      while (i < len) {
-        val j = newKeys.addNew (keysArray(i))
-        newValues(j) = myValues(i)
-        i += 1
-      }
+      if (len == myKeys.size) {
+        var i = 0
+        while (i < len) {
+          val j = newKeys.addNew (keysArray(i))
+          newValues(j) = myValues(i)
+          i += 1
+        }
+      } else
+      myKeys.copyTo (newKeys, (i,j) => newValues(i) = myValues(j))
     }
     myKeys = newKeys
     myValues = newValues
