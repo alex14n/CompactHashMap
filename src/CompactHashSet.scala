@@ -78,7 +78,7 @@ extends scala.collection.mutable.Set[T] {
               elem.asInstanceOf[Object].getClass
           ).asInstanceOf[Class[T]]
       )
-      fixedSet.copyTo (newFixedSet, null)
+      newFixedSet.copyFrom (fixedSet, null)
       fixedSet = newFixedSet
       fixedSet.add (elem)
   }
@@ -180,6 +180,14 @@ private abstract class FixedHashSet[T] (
    */
   final def capacity = arrayLength
 
+  /** Set size (for internal use only).
+   */
+  final protected def setSize (newSize: Int) {
+    counter = newSize
+    firstEmptyIndex = newSize
+    firstDeletedIndex = -1
+  }
+
   /** Array with this set elements.
    */
   final def getArray = array
@@ -243,7 +251,6 @@ private abstract class FixedHashSet[T] (
         setNextIndex (j, newIndex)
         setNextIndex (newIndex, -2) // Mark as 'set', default -1 means 'empty'
         array(newIndex) = elem
-        // hashCodes(newIndex) = h
         counter += 1
         if (newIndex == firstEmptyIndex) firstEmptyIndex += 1
         newIndex
@@ -256,7 +263,6 @@ private abstract class FixedHashSet[T] (
       setFirstIndex (i, newIndex)
       setNextIndex (newIndex, -2) // Mark as 'set', default -1 means 'empty'
       array(newIndex) = elem
-      // hashCodes(newIndex) = h
       counter += 1
       if (newIndex == firstEmptyIndex) firstEmptyIndex += 1
       newIndex
@@ -282,25 +288,26 @@ private abstract class FixedHashSet[T] (
       firstEmptyIndex - 1
     }
 
-  /** Copy all elements to another FixedHashSet.
+  /** Copy all elements from another FixedHashSet.
    *
-   *  @param  that  another set to copy elements to.
+   *  @param  that  another set to copy elements from.
    *  @param  callback  function to call for each copied element
    *                    with its new and old indices in set's arrays.
    */
-  final def copyTo (that: FixedHashSet[T], callback: (Int,Int) => Unit) {
-    // assert (that.isEmpty)
+  def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit) {
+    val array2 = that.getArray
+    val size2 = if (array2 eq null) 0 else array2.length
     var i = 0
-    if (firstDeletedIndex < 0)
-      while (i < firstEmptyIndex) {
-        val i2 = that.addNew (array(i))
+    if (size2 == that.size)
+      while (i < size2) {
+        val i2 = addNew (array2(i))
         if (null ne callback) callback(i2, i)
         i += 1
       }
     else
-      while (i < firstEmptyIndex) {
-        if (!isEmpty(i)) {
-          val i2 = that.addNew (array(i))
+      while (i < size2) {
+        if (!that.isEmpty(i)) {
+          val i2 = addNew (array2(i))
           if (null ne callback) callback(i2, i)
         }
         i += 1
@@ -357,7 +364,7 @@ private abstract class FixedHashSet[T] (
    */
   override final def clone = {
     val c = FixedHashSet (bits, elemClass)
-    copyTo (c, null)
+    c.copyFrom (this, null)
     c
   }
 
@@ -582,6 +589,34 @@ private final object FixedHashSet {
       val next = indexTable(len+i)
       next == 0 || next > 1
     }
+    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit) {
+      val array2 = that.getArray
+      val size2 = if (array2 eq null) 0 else array2.length
+      var i = 0
+      if (size2 == that.size) {
+        while (i < size2) {
+          val e = array2(i)
+          // inline addNew
+          val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
+          var j = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len - 1)
+          val next = indexTable(j)
+          indexTable (j) = (-1-i).asInstanceOf[Short]
+          indexTable (len+i) = if (next >= 0) 1 else next
+          localArray(i) = e
+          if (null ne callback) callback(i, i)
+          i += 1
+        }
+        setSize (size2)
+      } else {
+        while (i < size2) {
+          if (!that.isEmpty(i)) {
+            val i2 = addNew (array2(i))
+            if (null ne callback) callback(i2, i)
+          }
+          i += 1
+        }
+      }
+    }
   }
 
   /** FixedHashSet implementation with int-size index arrays.
@@ -648,7 +683,7 @@ private final object FixedHashSet {
       var i = -1-indexTable(((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len-1))
       while (i >= 0 && {
         val x = localArray(i)
-        (x.asInstanceOf[Object] ne elem.asInstanceOf[Object]) &&
+        (x ne elem.asInstanceOf[Object]) &&
           ((elem.asInstanceOf[Object] eq null) ||
           ! (elem.asInstanceOf[Object] equals x))
       })
@@ -658,6 +693,43 @@ private final object FixedHashSet {
     final def isEmpty (i: Int) = {
       val next = indexTable(len+i)
       next == 0 || next > 1
+    }
+    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit) {
+      val array2 = that.getArray
+      val size2 = if (array2 eq null) 0 else array2.length
+      var i = 0
+      if (size2 == that.size) {
+        if (array2.isInstanceOf[BoxedObjectArray]) {
+          val array: Array[Object] = array2.asInstanceOf[BoxedObjectArray].value
+          while (i < size2) {
+            val e = array(i)
+            // inline addNew
+            val h = if (null eq e) 0 else e.hashCode
+            var j = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len - 1)
+            val next = indexTable(j)
+            indexTable (j) = -1-i
+            indexTable (len+i) = if (next >= 0) 1 else next
+            localArray(i) = e
+            if (null ne callback) callback(i, i)
+            i += 1
+          }
+          setSize (size2)
+        } else {
+          while (i < size2) {
+            val i2 = addNew (array2(i))
+            if (null ne callback) callback(i2, i)
+            i += 1
+          }
+        }
+      } else {
+        while (i < size2) {
+          if (!that.isEmpty(i)) {
+            val i2 = addNew (array2(i))
+            if (null ne callback) callback(i2, i)
+          }
+          i += 1
+        }
+      }
     }
   }
 
@@ -677,7 +749,8 @@ private final object FixedHashSet {
    */
   final def apply[T] (bits: Int, elemClass: Class[T]): FixedHashSet[T] = {
     if (bits <= 0 || (elemClass eq null))
-      EmptyHashSet.asInstanceOf[FixedHashSet[T]] else {
+      EmptyHashSet.asInstanceOf[FixedHashSet[T]]
+    else {
       val a = newArray (elemClass, 1 << bits)
       if (bits <  8)
         new ByteHashSet (bits, elemClass, a) else

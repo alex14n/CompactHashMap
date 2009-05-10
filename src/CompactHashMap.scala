@@ -27,10 +27,16 @@ object CompactHashMap {
    */
   def apply[K,V] = new CompactHashMap[K,V]
 
-  /** Construct an empty map with given elements classes.
+  /** Construct an empty map with given key and value classes.
    */
   def apply[K,V] (keyClass: Class[K], valueClass: Class[V]) =
     new CompactHashMap (keyClass, valueClass)
+
+  /** Construct an empty map with given key and value classes
+   *  and initial capacity.
+   */
+  def apply[K,V] (keyClass: Class[K], valueClass: Class[V], capacity: Int) =
+    new CompactHashMap (keyClass, valueClass, capacity)
 
   /** Construct an empty map with given elements.
    */
@@ -57,6 +63,13 @@ class CompactHashMap[K,V] (
     this (keys.elemClass, valClass)
     myKeys = keys
     myValues = values
+  }
+
+  def this (keyClass: Class[K], valueClass: Class[V], capacity: Int) = {
+    this (keyClass, valueClass)
+    var bits = initialBits
+    while ((1 << bits) < capacity) bits += 1
+    resize (null.asInstanceOf[K], null.asInstanceOf[V], bits)
   }
 
   /** FixedHashSet with this map's keys.
@@ -141,7 +154,7 @@ class CompactHashMap[K,V] (
 
   /** Resize map.
    */
-  private[this] def resize (key: K, value: V) {
+  private[this] def resize (key: K, value: V, bits: Int) {
     // determine keys and values classes by first inserted objects
     // if they were not specified during map creation
     if (keyClass eq null) keyClass = (
@@ -153,21 +166,13 @@ class CompactHashMap[K,V] (
       else value.asInstanceOf[Object].getClass
     ).asInstanceOf[Class[V]]
     //
-    val newKeys = FixedHashSet (myKeys.bits + 1, keyClass)
+    val newKeys = FixedHashSet (bits, keyClass)
     val newValues = newArray (valueClass, newKeys.capacity)
-    val keysArray = myKeys.getArray
-    if (keysArray ne null) {
-      val len = keysArray.size
-      if (len == myKeys.size) {
-        var i = 0
-        while (i < len) {
-          val j = newKeys.addNew (keysArray(i))
-          newValues(j) = myValues(i)
-          i += 1
-        }
-      } else
-      myKeys.copyTo (newKeys, (i,j) => newValues(i) = myValues(j))
-    }
+    if ((myValues ne null) && (myKeys.size == myValues.length)) {
+      newKeys.copyFrom (myKeys, null)
+      myValues.copyToArray (newValues, 0)
+    } else
+      newKeys.copyFrom (myKeys, (i,j) => newValues(i) = myValues(j))
     myKeys = newKeys
     myValues = newValues
   }
@@ -186,7 +191,7 @@ class CompactHashMap[K,V] (
       myValues(i) = value
     } catch {
       case e: ResizeNeeded =>
-        resize (key, value)
+        resize (key, value, myKeys.bits + 1)
         val i2 = myKeys.addNew (key)
         myValues(i2) = value
     }
@@ -207,7 +212,7 @@ class CompactHashMap[K,V] (
         myValues(j) = newV
       } catch {
         case e: ResizeNeeded =>
-          resize (key, newV)
+          resize (key, newV, myKeys.bits + 1)
           val j = myKeys.addNew (key)
           myValues(j) = newV
       }
@@ -230,7 +235,7 @@ class CompactHashMap[K,V] (
         myValues(j) = newV
       } catch {
         case e: ResizeNeeded =>
-          resize (key, newV)
+          resize (key, newV, myKeys.bits + 1)
           val j = myKeys.addNew (key)
           myValues(j) = newV
       }
@@ -251,7 +256,7 @@ class CompactHashMap[K,V] (
       myValues(j) = newValue
     } catch {
       case e: ResizeNeeded =>
-        resize (key, newValue)
+        resize (key, newValue, myKeys.bits + 1)
         val j = myKeys.addNew (key)
         myValues(j) = newValue
     }
@@ -297,7 +302,7 @@ class CompactHashMap[K,V] (
   override def clone = {
     val newKeys = FixedHashSet (myKeys.bits, keyClass)
     val newValues = newArray (valueClass, newKeys.capacity)
-    myKeys.copyTo (newKeys, (i,j) => newValues(i) = myValues(j))
+    newKeys.copyFrom (myKeys, (i,j) => newValues(i) = myValues(j))
     new CompactHashMap (newKeys, newValues, valueClass)
   }
 
