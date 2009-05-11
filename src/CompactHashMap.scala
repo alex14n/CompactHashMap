@@ -49,8 +49,8 @@ object CompactHashMap {
  */
 @serializable
 class CompactHashMap[K,V] (
-  private[this] final var keyClass: Class[K],
-  private[this] final var valueClass: Class[V]
+  private[this] var keyClass: Class[K],
+  private[this] var valueClass: Class[V]
 ) extends scala.collection.mutable.Map[K,V] {
 
   def this () = this (null, null)
@@ -74,11 +74,11 @@ class CompactHashMap[K,V] (
 
   /** FixedHashSet with this map's keys.
    */
-  final private[this] var myKeys = EmptyHashSet.asInstanceOf[FixedHashSet[K]]
+  private[this] var myKeys = EmptyHashSet.asInstanceOf[FixedHashSet[K]]
 
   /** Array with this map's values.
    */
-  final private[this] var myValues: Array[V] = null
+  private[this] var myValues: Array[V] = null
 
   /** Is the given key mapped to a value by this map?
    *

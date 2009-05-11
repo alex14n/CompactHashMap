@@ -29,6 +29,12 @@ object CompactHashSet {
   def apply[T] (elemClass: Class[T]) =
     new CompactHashSet (elemClass)
 
+  /** Construct an empty set with given elements class
+   *  and initial capacity.
+   */
+  def apply[T] (elemClass: Class[T], capacity: Int) =
+    new CompactHashSet (elemClass, capacity)
+
   /** Construct an empty set with given elements.
    */
   def apply[T] (elems: T*) =
@@ -47,6 +53,13 @@ extends scala.collection.mutable.Set[T] {
   def this (set: FixedHashSet[T]) = {
     this (set.elemClass)
     fixedSet = set
+  }
+
+  def this (elemClass: Class[T], capacity: Int) = {
+    this (elemClass)
+    var bits = initialBits
+    while ((1 << bits) < capacity) bits += 1
+    fixedSet = FixedHashSet (bits, elemClass)
   }
 
   /** Array to hold this set elements.
@@ -162,15 +175,15 @@ private abstract class FixedHashSet[T] (
 
   /** Number of elements in this set
    */
-  final private[this] var counter = 0
+  private[this] var counter = 0
 
   /** Starting index of empty elements in array
    */
-  final private[this] var firstEmptyIndex = 0
+  private[this] var firstEmptyIndex = 0
 
   /** Index of first deleted elements list in array
    */
-  final private[this] var firstDeletedIndex = -1
+  private[this] var firstDeletedIndex = -1
 
   /** Number of elements in this set.
    */
