@@ -159,4 +159,12 @@ class CompactHashSetTest {
     assertTrue (set.isEmpty)
     set.getArray foreach { x => assertEquals (null, x) }
   }
+
+  @Test def testElements2 {
+    val set = new CompactHashSet[Int]
+    val list = (1 to 1000).toList
+    set ++= list
+    assertEquals (list.size, set.size)
+    assertEquals (list, set.elements.toList)
+  }
 }
