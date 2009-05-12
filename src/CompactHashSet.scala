@@ -624,7 +624,6 @@ private final object FixedHashSet {
           val j = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len - 1)
           val next = indexTable(j)
           indexTable (j) = (-1-i).asInstanceOf[Short]
-          indexTable (len+i) = if (next >= 0) 1 else next
           if (next < 0) indexTable (len+i) = next
           if (null ne callback) callback(i, i)
           i += 1
@@ -691,7 +690,6 @@ private final object FixedHashSet {
           val j = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len - 1)
           val next = indexTable(j)
           indexTable (j) = -1-i
-          indexTable (len+i) = if (next >= 0) 1 else next
           if (next < 0) indexTable (len+i) = next
           if (null ne callback) callback(i, i)
           i += 1
