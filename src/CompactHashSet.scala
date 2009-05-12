@@ -291,7 +291,7 @@ private abstract class FixedHashSet[T] (
     else {
       // (inline hashCode) position in firstIndex table
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
-      var i = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (arrayLength - 1)
+      val i = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (arrayLength - 1)
       val next = firstIndex (i)
       setFirstIndex (i, firstEmptyIndex)
       setNextIndex (firstEmptyIndex, if (next < 0) -2 else next)
@@ -311,13 +311,22 @@ private abstract class FixedHashSet[T] (
     val array2 = that.getArray
     val size2 = if (array2 eq null) 0 else array2.length
     var i = 0
-    if (size2 == that.size)
+    if (size2 == that.size) {
       while (i < size2) {
-        val i2 = addNew (array2(i))
-        if (null ne callback) callback(i2, i)
+        val elem = array2(i)
+        // inline addNew
+        val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
+        val j = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (arrayLength - 1)
+        val next = firstIndex (j)
+        setFirstIndex (j, i)
+        setNextIndex (i, if (next < 0) -2 else next)
+        //
+        if (null ne callback) callback(i, i)
         i += 1
       }
-    else
+      if (array2 ne null) array2.copyToArray (array, 0)
+      setSize (size2)
+    } else
       while (i < size2) {
         if (!that.isEmpty(i)) {
           val i2 = addNew (array2(i))
@@ -611,14 +620,15 @@ private final object FixedHashSet {
           val e = array2(i)
           // inline addNew
           val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
-          var j = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len - 1)
+          val j = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len - 1)
           val next = indexTable(j)
           indexTable (j) = (-1-i).asInstanceOf[Short]
           indexTable (len+i) = if (next >= 0) 1 else next
-          localArray(i) = e
+          // localArray(i) = e
           if (null ne callback) callback(i, i)
           i += 1
         }
+        if (array2 ne null) array2.copyToArray (localArray, 0)
         setSize (size2)
       } else {
         while (i < size2) {
@@ -666,6 +676,35 @@ private final object FixedHashSet {
     final def isEmpty (i: Int) = {
       val next = indexTable(len+i)
       next == 0 || next > 1
+    }
+    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit) {
+      val array2 = that.getArray
+      val size2 = if (array2 eq null) 0 else array2.length
+      var i = 0
+      if (size2 == that.size) {
+        while (i < size2) {
+          val e = array2(i)
+          // inline addNew
+          val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
+          val j = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len - 1)
+          val next = indexTable(j)
+          indexTable (j) = -1-i
+          indexTable (len+i) = if (next >= 0) 1 else next
+          // localArray(i) = e
+          if (null ne callback) callback(i, i)
+          i += 1
+        }
+        if (array2 ne null) array2.copyToArray (localArray, 0)
+        setSize (size2)
+      } else {
+        while (i < size2) {
+          if (!that.isEmpty(i)) {
+            val i2 = addNew (array2(i))
+            if (null ne callback) callback(i2, i)
+          }
+          i += 1
+        }
+      }
     }
   }
 
@@ -718,14 +757,15 @@ private final object FixedHashSet {
             val e = array(i)
             // inline addNew
             val h = if (null eq e) 0 else e.hashCode
-            var j = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len - 1)
+            val j = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len - 1)
             val next = indexTable(j)
             indexTable (j) = -1-i
             indexTable (len+i) = if (next >= 0) 1 else next
-            localArray(i) = e
+            // localArray(i) = e
             if (null ne callback) callback(i, i)
             i += 1
           }
+          System.arraycopy (array, 0, localArray, 0, size2)
           setSize (size2)
         } else {
           while (i < size2) {
