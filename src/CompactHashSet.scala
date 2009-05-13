@@ -751,8 +751,8 @@ private final object FixedHashSet {
       val size2 = if (array2 eq null) 0 else array2.length
       var i = 0
       if (size2 == that.size) {
+        fill (indexTable, len, len+size2, 1)
         if (array2.isInstanceOf[BoxedObjectArray]) {
-          fill (indexTable, len, len+size2, 1)
           val array: Array[Object] = array2.asInstanceOf[BoxedObjectArray].value
           while (i < size2) {
             val e = array(i)
@@ -766,14 +766,21 @@ private final object FixedHashSet {
             i += 1
           }
           System.arraycopy (array, 0, localArray, 0, size2)
-          setSize (size2)
         } else {
           while (i < size2) {
-            val i2 = addNew (array2(i))
-            if (null ne callback) callback(i2, i)
+            val e = array2(i)
+            // inline addNew
+            val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
+            val j = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (len - 1)
+            val next = indexTable(j)
+            indexTable (j) = -1-i
+            if (next < 0) indexTable (len+i) = next
+            if (null ne callback) callback(i, i)
             i += 1
           }
+          if (array2 ne null) array2.copyToArray (localArray.asInstanceOf[Array[T]], 0)
         }
+        setSize (size2)
       } else {
         while (i < size2) {
           if (!that.isEmpty(i)) {
