@@ -330,4 +330,8 @@ class CompactHashMap[K,V] (
     elements foreach { x => a{i} = x; i += 1 }
     a
   }
+
+  /** Converts this map to a fresh List with elements.
+    */
+  override def toList = myKeys.toListMap { (k,i) => (k,myValues(i)) }
 }

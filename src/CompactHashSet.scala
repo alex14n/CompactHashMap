@@ -131,6 +131,10 @@ extends scala.collection.mutable.Set[T] {
    *  After this operation is completed, the set will be empty.
    */
   override def clear { fixedSet.clear }
+
+  /** New List with this set elements.
+   */
+  override def toList = fixedSet.toList
 }
 
 /** Hash set backed by fixed size array.
@@ -488,6 +492,32 @@ private abstract class FixedHashSet[T] (
   /** Return <code>true</code> if set contains element <code>elem</code>.
    */
   final def contains (elem: T) = positionOf (elem) >= 0
+
+  /** List of this set elements.
+   */
+  final override def toList = {
+    var list = List[T] ()
+    var i = firstEmptyIndex
+    while (i > 0) {
+      i -= 1
+      if (!isEmpty(i))
+        list = array(i) :: list
+    }
+    list
+  }
+
+  /** List of this set elements.
+   */
+  final def toListMap[F] (f: (T,Int) => F) = {
+    var list = List[F] ()
+    var i = firstEmptyIndex
+    while (i > 0) {
+      i -= 1
+      if (!isEmpty(i))
+        list = f(array(i),i) :: list
+    }
+    list
+  }
 }
 
 import scala.runtime._
