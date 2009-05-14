@@ -265,8 +265,8 @@ private abstract class FixedHashSet[T] (
     }
     if (counter >= arrayLength) throw new ResizeNeeded
     val newIndex = findEmptySpot
-    setFirstIndex (i, newIndex | (hc & hcBitmask))
-    setNextIndex (newIndex,  if (next < 0) -2 else next) // -2 = 'set', default -1 = 'empty'
+    setFirstIndex (i, newIndex | hcBits)
+    setNextIndex (newIndex, if (next < 0) -2 else next) // -2 = 'set', default -1 = 'empty'
     array(newIndex) = elem
     counter += 1
     newIndex
