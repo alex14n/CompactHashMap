@@ -47,10 +47,10 @@ class CompactHashSetTest {
     val set = FixedHashSet (2, classOf[Int])
     for (i <- 100000 to 100003) set add i
 
-    assertEquals ( 0, set.indexOf(100000))
-    assertEquals ( 1, set.indexOf(100001))
-    assertEquals ( 2, set.indexOf(100002))
-    assertEquals ( 3, set.indexOf(100003))
+    assertEquals ( 0, set.positionOf(100000))
+    assertEquals ( 1, set.positionOf(100001))
+    assertEquals ( 2, set.positionOf(100002))
+    assertEquals ( 3, set.positionOf(100003))
 
     assertFalse (set.isEmpty(0))
     assertFalse (set.isEmpty(1))
@@ -62,28 +62,28 @@ class CompactHashSetTest {
     // assertEquals(4, set.firstEmptyIndex)
     // assertEquals(2, set.firstDeletedIndex)
 
-    assertEquals ( 0, set.indexOf(100000))
-    assertEquals ( 1, set.indexOf(100001))
-    assertEquals (-1, set.indexOf(100002))
-    assertEquals ( 3, set.indexOf(100003))
+    assertEquals ( 0, set.positionOf(100000))
+    assertEquals ( 1, set.positionOf(100001))
+    assertEquals (-1, set.positionOf(100002))
+    assertEquals ( 3, set.positionOf(100003))
 
     assertEquals ( 1, set.delete (100001))
     assertEquals ( 2, set.size)
     // assertEquals(2, set.firstDeletedIndex)
 
-    assertEquals ( 0, set.indexOf(100000))
-    assertEquals (-1, set.indexOf(100001))
-    assertEquals (-1, set.indexOf(100002))
-    assertEquals ( 3, set.indexOf(100003))
+    assertEquals ( 0, set.positionOf(100000))
+    assertEquals (-1, set.positionOf(100001))
+    assertEquals (-1, set.positionOf(100002))
+    assertEquals ( 3, set.positionOf(100003))
 
     assertEquals ( 0, set.delete (100000))
     assertEquals ( 1, set.size)
     // assertEquals(2, set.firstDeletedIndex)
 
-    assertEquals (-1, set.indexOf(100000))
-    assertEquals (-1, set.indexOf(100001))
-    assertEquals (-1, set.indexOf(100002))
-    assertEquals ( 3, set.indexOf(100003))
+    assertEquals (-1, set.positionOf(100000))
+    assertEquals (-1, set.positionOf(100001))
+    assertEquals (-1, set.positionOf(100002))
+    assertEquals ( 3, set.positionOf(100003))
 
     assertEquals ( 3, set.delete (100003))
     assertEquals ( 0, set.size)

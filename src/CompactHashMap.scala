@@ -85,7 +85,7 @@ class CompactHashMap[K,V] (
    *  @param   key  the key
    *  @return  <code>true</code> if there is a mapping for key in this map
    */
-  override def contains (key: K) = myKeys.indexOf(key) >= 0
+  override def contains (key: K) = myKeys.positionOf(key) >= 0
 
   /** Check if this map maps <code>key</code> to a value and return the
    *  value if it exists.
@@ -94,7 +94,7 @@ class CompactHashMap[K,V] (
    *  @return  the value of the mapping, if it exists
    */
   def get (key: K): Option[V] = {
-    val i = myKeys.indexOf(key)
+    val i = myKeys.positionOf(key)
     if (i >= 0) Some(myValues(i)) else None
   }
 
@@ -106,7 +106,7 @@ class CompactHashMap[K,V] (
    *  @return  the value associated with the given key.
    */
   override def apply (key: K): V = {
-    val i = myKeys.indexOf(key)
+    val i = myKeys.positionOf(key)
     if (i >= 0) myValues(i) else default(key)
   }
 
@@ -114,7 +114,7 @@ class CompactHashMap[K,V] (
     *  Return that value if it exists, otherwise return <code>default</code>.
     */
   override def getOrElse[V2 >: V] (key: K, default: => V2): V2 = {
-    val i = myKeys.indexOf(key)
+    val i = myKeys.positionOf(key)
     if (i >= 0) myValues(i) else default
   }
 
@@ -122,7 +122,7 @@ class CompactHashMap[K,V] (
     *  Return that value if it exists, otherwise return <code>default</code>.
     */
   def getOrElseF[V2 >: V] (key: K, default: () => V2): V2 = {
-    val i = myKeys.indexOf(key)
+    val i = myKeys.positionOf(key)
     if (i >= 0) myValues(i) else default()
   }
 
@@ -130,7 +130,7 @@ class CompactHashMap[K,V] (
     *  Return that value if it exists, otherwise return <code>default</code>.
     */
   def getOrElseV[V2 >: V] (key: K, default: V2): V2 = {
-    val i = myKeys.indexOf(key)
+    val i = myKeys.positionOf(key)
     if (i >= 0) myValues(i) else default
   }
 
@@ -203,7 +203,7 @@ class CompactHashMap[K,V] (
    * @param  updateFunction  Function to apply to existing value
    */
   def insertOrUpdate (key: K, newValue: => V, updateFunction: V => V) {
-    val i = myKeys.indexOf(key)
+    val i = myKeys.positionOf(key)
     if (i >= 0) myValues(i) = updateFunction (myValues(i))
     else {
       val newV = newValue
@@ -226,7 +226,7 @@ class CompactHashMap[K,V] (
    * @param  updateFunction  Function to apply to existing value
    */
   def insertOrUpdateF (key: K, newValue: () => V, updateFunction: V => V) {
-    val i = myKeys.indexOf(key)
+    val i = myKeys.positionOf(key)
     if (i >= 0) myValues(i) = updateFunction (myValues(i))
     else {
       val newV = newValue ()
@@ -249,7 +249,7 @@ class CompactHashMap[K,V] (
    * @param  updateFunction  Function to apply to existing value
    */
   def insertOrUpdateV (key: K, newValue: V, updateFunction: V => V) {
-    val i = myKeys.indexOf(key)
+    val i = myKeys.positionOf(key)
     if (i >= 0) myValues(i) = updateFunction (myValues(i))
     else try {
       val j = myKeys.addNew (key)

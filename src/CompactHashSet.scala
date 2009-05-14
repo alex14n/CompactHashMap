@@ -71,7 +71,7 @@ extends scala.collection.mutable.Set[T] {
    *  @param  elem  the element to check for membership.
    *  @return  <code>true</code> if <code>elem</code> is contained in this set.
    */
-  def contains (elem: T) = fixedSet.indexOf (elem) >= 0
+  def contains (elem: T) = fixedSet.positionOf (elem) >= 0
 
   /** Add a new element to the set.
    *
@@ -172,7 +172,9 @@ private abstract class FixedHashSet[T] (
    */
   def hcBitmask: Int
 
-  // def indexOf[B >: T] (elem: B): Int
+  /** Return index of elem in array or -1 if it does not exists.
+   */
+  def positionOf[B >: T] (elem: B): Int
 
   /** Array with this set elements.
    */
@@ -446,7 +448,7 @@ private abstract class FixedHashSet[T] (
 
   /** Return <code>true</code> if set contains element <code>elem</code>.
    */
-  final def contains (elem: T) = indexOf (elem) >= 0
+  final def contains (elem: T) = positionOf (elem) >= 0
 
   /** List of this set elements.
    */
@@ -545,7 +547,7 @@ private final object FixedHashSet {
     // scalac treat 'array' as method call :-(
     // until it's private[this] so make a local copy
     final private[this] val localArray = a
-    final override def indexOf[B >: T] (elem: B) = {
+    final override def positionOf[B >: T] (elem: B) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
       val mask = 0x7F ^ (len-1)
@@ -637,7 +639,7 @@ private final object FixedHashSet {
 
     final private[this] val len = 1 << bits
     final private[this] val localArray = a
-    final override def indexOf[B >: T] (elem: B) = {
+    final override def positionOf[B >: T] (elem: B) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
       val mask = 0x7FFF ^ (len-1)
@@ -727,7 +729,7 @@ private final object FixedHashSet {
 
     final private[this] val len = 1 << bits
     final private[this] val localArray = a
-    final override def indexOf[B >: T] (elem: B) = {
+    final override def positionOf[B >: T] (elem: B) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
       val mask = 0x7FFFFFFF ^ (len-1)
@@ -818,7 +820,7 @@ private final object FixedHashSet {
 
     final private[this] val len = 1 << bits
     final private[this] val localArray: Array[Object] = a.asInstanceOf[BoxedObjectArray].value
-    final override def indexOf[B >: T] (elem: B) = {
+    final override def positionOf[B >: T] (elem: B) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
       val mask = 0x7FFFFFFF ^ (len-1)
@@ -904,7 +906,7 @@ private final object FixedHashSet {
    */
   @serializable
   final object EmptyHashSet extends FixedHashSet[Any] (initialBits - 1, null, null) {
-    final override def indexOf[B >: Any] (elem: B) = -1
+    final override def positionOf[B >: Any] (elem: B) = -1
     final def isEmpty (i: Int) = true
     protected final def firstIndex (i: Int) = -1
     protected final def nextIndex (i: Int) = -1
