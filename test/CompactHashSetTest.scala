@@ -45,48 +45,48 @@ class CompactHashSetTest {
 
   @Test def testFixedDel {
     val set = FixedHashSet (2, classOf[Int])
-    for (i <- 0 to 3) set.add (i)
+    for (i <- 100000 to 100003) set add i
 
-    assertEquals(0, set.positionOf(0))
-    assertEquals(1, set.positionOf(1))
-    assertEquals(2, set.positionOf(2))
-    assertEquals(3, set.positionOf(3))
+    assertEquals ( 0, set.indexOf(100000))
+    assertEquals ( 1, set.indexOf(100001))
+    assertEquals ( 2, set.indexOf(100002))
+    assertEquals ( 3, set.indexOf(100003))
 
     assertFalse (set.isEmpty(0))
     assertFalse (set.isEmpty(1))
     assertFalse (set.isEmpty(2))
     assertFalse (set.isEmpty(3))
 
-    assertEquals(2, set.delete (2))
-    assertEquals(3, set.size)
+    assertEquals ( 2, set.delete (100002))
+    assertEquals ( 3, set.size)
     // assertEquals(4, set.firstEmptyIndex)
     // assertEquals(2, set.firstDeletedIndex)
 
-    assertEquals(0, set.positionOf(0))
-    assertEquals(1, set.positionOf(1))
-    assertTrue (set.positionOf(2) < 0)
-    assertEquals(3, set.positionOf(3))
+    assertEquals ( 0, set.indexOf(100000))
+    assertEquals ( 1, set.indexOf(100001))
+    assertEquals (-1, set.indexOf(100002))
+    assertEquals ( 3, set.indexOf(100003))
 
-    assertEquals(1, set.delete (1))
-    assertEquals(2, set.size)
+    assertEquals ( 1, set.delete (100001))
+    assertEquals ( 2, set.size)
     // assertEquals(2, set.firstDeletedIndex)
 
-    assertEquals(0, set.positionOf(0))
-    assertTrue (set.positionOf(1) < 0)
-    assertTrue (set.positionOf(2) < 0)
-    assertEquals(3, set.positionOf(3))
+    assertEquals ( 0, set.indexOf(100000))
+    assertEquals (-1, set.indexOf(100001))
+    assertEquals (-1, set.indexOf(100002))
+    assertEquals ( 3, set.indexOf(100003))
 
-    assertEquals(0, set.delete (0))
-    assertEquals(1, set.size)
+    assertEquals ( 0, set.delete (100000))
+    assertEquals ( 1, set.size)
     // assertEquals(2, set.firstDeletedIndex)
 
-    assertTrue (set.positionOf(0) < 0)
-    assertTrue (set.positionOf(1) < 0)
-    assertTrue (set.positionOf(2) < 0)
-    assertEquals(3, set.positionOf(3))
+    assertEquals (-1, set.indexOf(100000))
+    assertEquals (-1, set.indexOf(100001))
+    assertEquals (-1, set.indexOf(100002))
+    assertEquals ( 3, set.indexOf(100003))
 
-    assertEquals(3, set.delete (3))
-    assertEquals(0, set.size)
+    assertEquals ( 3, set.delete (100003))
+    assertEquals ( 0, set.size)
     // assertEquals(3, set.firstEmptyIndex)
     // assertEquals(2, set.firstDeletedIndex)
 
@@ -97,25 +97,25 @@ class CompactHashSetTest {
 
     assertEquals (Nil, set.elements.toList)
 
-    assertEquals (2, set.add(10))
-    // assertEquals (0, set.firstDeletedIndex)
-    assertEquals (0, set.add(11))
-    // assertEquals (1, set.firstDeletedIndex)
-    assertEquals (1, set.add(12))
+    assertEquals ( 2, set.add(1000010))
+    // assertEquals ( 0, set.firstDeletedIndex)
+    assertEquals ( 0, set.add(1000011))
+    // assertEquals ( 1, set.firstDeletedIndex)
+    assertEquals ( 1, set.add(1000012))
     // assertEquals (-1, set.firstDeletedIndex)
-    assertEquals (3, set.add(13))
+    assertEquals ( 3, set.add(1000013))
 
     val set2 = Set() ++ set.elements
-    assertEquals (Set(10,11,12,13), set2)
+    assertEquals (Set(1000010,1000011,1000012,1000013), set2)
 
-    set.delete (11)
-    // assertEquals (0, set.firstDeletedIndex)
-    set.delete (12)
-    // assertEquals (1, set.firstDeletedIndex)
+    set.delete (1000011)
+    // assertEquals ( 0, set.firstDeletedIndex)
+    set.delete (1000012)
+    // assertEquals ( 1, set.firstDeletedIndex)
     val set3 = Set() ++ set.elements
-    assertEquals (Set(10,13), set3)
-    assertEquals (1, set.add(12))
-    assertEquals (0, set.add(11))
+    assertEquals (Set(1000010,1000013), set3)
+    assertEquals ( 1, set.add(1000012))
+    assertEquals ( 0, set.add(1000011))
   }
 
   @Test def testFixedDel2 {

@@ -37,10 +37,14 @@ class CompactHashMapTest {
     assertEquals ("else", map.getOrElse(null, "else"))
     map update (null, "null")
     assertEquals ("null", map.getOrElse(null, "else"))
+    map update (null, "test")
+    assertEquals ("test", map.getOrElse(null, "else"))
 
     assertEquals ("else", map.getOrElse("null", "else"))
     map update ("null", null)
     assertEquals (null, map.getOrElse("null", "else"))
+    map update ("null", "test")
+    assertEquals ("test", map.getOrElse("null", "else"))
   }
 
   @Test def testUntyped1 {
