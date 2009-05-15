@@ -227,7 +227,9 @@ private abstract class FixedHashSet[T] (
 
   /** Return index in array to insert new element.
    */
-  private[this] final def findEmptySpot =
+  protected final def findEmptySpot = {
+    if (counter >= arrayLength) throw new ResizeNeeded
+    counter += 1
     if (firstDeletedIndex >= 0) {
       val i = firstDeletedIndex
       firstDeletedIndex = nextIndex (firstDeletedIndex)
@@ -238,39 +240,14 @@ private abstract class FixedHashSet[T] (
       firstEmptyIndex += 1
       i
     }
+  }
 
   /** Adds element to set.
    *  Throws ResizeNeeded if set is full.
    *
    * @return  index of inserted element in array
    */
-  final def add (elem: T): Int = {
-    // (inline hashCode) position in firstIndex table
-    val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
-    val hc = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h)
-    val i = hc & (arrayLength - 1)
-    val next = firstIndex (i)
-    // Check if elem already present
-    var j = next
-    val mask = hcBitmask
-    val hcBits = hc & mask
-    while (j >= 0) {
-      val k = j & (arrayLength - 1)
-      if (hcBits == (j & mask)) {
-        val o = array(k)
-        if ((o.asInstanceOf[Object] eq elem.asInstanceOf[Object]) || o == elem)
-          return k
-      }
-      j = nextIndex(k)
-    }
-    if (counter >= arrayLength) throw new ResizeNeeded
-    val newIndex = findEmptySpot
-    setFirstIndex (i, newIndex | hcBits)
-    setNextIndex (newIndex, if (next < 0) -2 else next) // -2 = 'set', default -1 = 'empty'
-    array(newIndex) = elem
-    counter += 1
-    newIndex
-  }
+  def add (elem: T): Int
 
   /** Adds element to set that does not already exist in this set.
    *  Throws ResizeNeeded if set is full.
@@ -278,17 +255,15 @@ private abstract class FixedHashSet[T] (
    * @return  index of inserted element in array
    */
   final def addNew (elem: T) = {
-    if (counter >= arrayLength) throw new ResizeNeeded
+    val newIndex = findEmptySpot
     // (inline hashCode) position in firstIndex table
     val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
-    val hc = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h)
+    val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
     val i = hc & (arrayLength - 1)
     val next = firstIndex (i)
-    val newIndex = findEmptySpot
     setFirstIndex (i, newIndex | (hc & hcBitmask))
     setNextIndex (newIndex, if (next < 0) -2 else next)
     array(newIndex) = elem
-    counter += 1
     newIndex
   }
 
@@ -612,6 +587,31 @@ private final object FixedHashSet {
         }
       }
     }
+    final override def add (elem: T): Int = {
+      // (inline hashCode) position in firstIndex table
+      val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
+      val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
+      val i = hc & (len - 1)
+      val next = indexTable (i)
+      // Check if elem already present
+      var j = -1-next
+      val mask = 0x7F ^ (len-1)
+      val hcBits = hc & mask
+      while (j >= 0) {
+        val k = j & (len - 1)
+        if (hcBits == (j & mask)) {
+          val o = localArray (k)
+          if ((o.asInstanceOf[Object] eq elem.asInstanceOf[Object]) || o == elem)
+            return k
+        }
+        j = -1-indexTable (len+k)
+      }
+      val newIndex = findEmptySpot
+      indexTable (i) = (-1-(newIndex | hcBits)).asInstanceOf[Byte]
+      indexTable (len + newIndex) = if (next < 0) next else 1
+      localArray (newIndex) = elem
+      newIndex
+    }
   }
 
   /** FixedHashSet implementation with short-size index arrays.
@@ -704,6 +704,31 @@ private final object FixedHashSet {
         }
       }
     }
+    final override def add (elem: T): Int = {
+      // (inline hashCode) position in firstIndex table
+      val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
+      val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
+      val i = hc & (len - 1)
+      val next = indexTable (i)
+      // Check if elem already present
+      var j = -1-next
+      val mask = 0x7FFF ^ (len-1)
+      val hcBits = hc & mask
+      while (j >= 0) {
+        val k = j & (len - 1)
+        if (hcBits == (j & mask)) {
+          val o = localArray (k)
+          if ((o.asInstanceOf[Object] eq elem.asInstanceOf[Object]) || o == elem)
+            return k
+        }
+        j = -1-indexTable (len+k)
+      }
+      val newIndex = findEmptySpot
+      indexTable (i) = (-1-(newIndex | hcBits)).asInstanceOf[Short]
+      indexTable (len + newIndex) = if (next < 0) next else 1
+      localArray (newIndex) = elem
+      newIndex
+    }
   }
 
   /** FixedHashSet implementation with int-size index arrays.
@@ -794,8 +819,32 @@ private final object FixedHashSet {
         }
       }
     }
+    final override def add (elem: T): Int = {
+      // (inline hashCode) position in firstIndex table
+      val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
+      val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
+      val i = hc & (len - 1)
+      val next = indexTable (i)
+      // Check if elem already present
+      var j = -1-next
+      val mask = 0x7FFFFFFF ^ (len-1)
+      val hcBits = hc & mask
+      while (j >= 0) {
+        val k = j & (len - 1)
+        if (hcBits == (j & mask)) {
+          val o = localArray (k)
+          if ((o.asInstanceOf[Object] eq elem.asInstanceOf[Object]) || o == elem)
+            return k
+        }
+        j = -1-indexTable (len+k)
+      }
+      val newIndex = findEmptySpot
+      indexTable (i) = -1-(newIndex | hcBits)
+      indexTable (len + newIndex) = if (next < 0) next else 1
+      localArray (newIndex) = elem
+      newIndex
+    }
   }
-
 
   /** FixedHashSet implementation with int-size index arrays.
    */
@@ -900,6 +949,31 @@ private final object FixedHashSet {
         }
       }
     }
+    final override def add (elem: T): Int = {
+      // (inline hashCode) position in firstIndex table
+      val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
+      val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
+      val i = hc & (len - 1)
+      val next = indexTable (i)
+      // Check if elem already present
+      var j = -1-next
+      val mask = 0x7FFFFFFF ^ (len-1)
+      val hcBits = hc & mask
+      while (j >= 0) {
+        val k = j & (len - 1)
+        if (hcBits == (j & mask)) {
+          val o = localArray (k)
+          if ((o eq elem.asInstanceOf[Object]) || o == elem)
+            return k
+        }
+        j = -1-indexTable (len+k)
+      }
+      val newIndex = findEmptySpot
+      indexTable (i) = -1-(newIndex | hcBits)
+      indexTable (len + newIndex) = if (next < 0) next else 1
+      localArray (newIndex) = elem.asInstanceOf[Object]
+      newIndex
+    }
   }
 
   /** Empty FixedHashSet implementation.
@@ -915,6 +989,7 @@ private final object FixedHashSet {
     final def hcBitmask = 0
     final def getIndexArray = null
     final def copyFrom (that: FixedHashSet[Any], callback: (Int,Int) => Unit) { }
+    final override def add (elem: Any): Int = { throw new ResizeNeeded }
   }
 
   /** Construct FixedHashSet implementation with given parameters.
