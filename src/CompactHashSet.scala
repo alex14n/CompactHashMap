@@ -877,7 +877,7 @@ private final object FixedHashSet {
       var i = -1-indexTable(hc & (len-1))
       while (i >= 0 && ((hcBits != (i & mask)) || {
         val x = localArray(i & (len-1))
-        (x.asInstanceOf[Object] ne elem.asInstanceOf[Object]) && x != elem
+        (x ne elem.asInstanceOf[Object]) && !((x ne null) && (x equals elem))
       }))
         i = -1-indexTable(len + (i & (len-1)))
       if (i >= 0) i & (len-1) else -1
@@ -963,7 +963,7 @@ private final object FixedHashSet {
         val k = j & (len - 1)
         if (hcBits == (j & mask)) {
           val o = localArray (k)
-          if ((o eq elem.asInstanceOf[Object]) || o == elem)
+          if ((o eq elem.asInstanceOf[Object]) || ((o ne null) && (o equals elem)))
             return k
         }
         j = -1-indexTable (len+k)
