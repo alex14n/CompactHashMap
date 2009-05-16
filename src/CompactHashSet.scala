@@ -579,7 +579,7 @@ private final object FixedHashSet {
               j = -1-index2(size2 + arrayIndex)
             }
             if (next1 < 0) indexTable (i) = next1
-            if (next2 < 0) indexTable (i | (mask ^ mask2)) = next2
+            if (next2 < 0) indexTable (i + size2) = next2
             i += 1
           }
         } else
@@ -704,7 +704,7 @@ private final object FixedHashSet {
               j = -1-index2(size2 + arrayIndex)
             }
             if (next1 < 0) indexTable (i) = next1
-            if (next2 < 0) indexTable (i | (mask ^ mask2)) = next2
+            if (next2 < 0) indexTable (i + size2) = next2
             i += 1
           }
         } else
@@ -827,7 +827,7 @@ private final object FixedHashSet {
               j = -1-index2(size2 + arrayIndex)
             }
             if (next1 < 0) indexTable (i) = next1
-            if (next2 < 0) indexTable (i | (mask ^ mask2)) = next2
+            if (next2 < 0) indexTable (i + size2) = next2
             i += 1
           }
         } else
@@ -950,7 +950,7 @@ private final object FixedHashSet {
               j = -1-index2(size2 + arrayIndex)
             }
             if (next1 < 0) indexTable (i) = next1
-            if (next2 < 0) indexTable (i | (mask ^ mask2)) = next2
+            if (next2 < 0) indexTable (i + size2) = next2
             i += 1
           }
         } else if (array2.isInstanceOf[BoxedObjectArray]) {
