@@ -568,18 +568,18 @@ private final object FixedHashSet {
             while (j >= 0) {
               val arrayIndex = j & (size2-1)
               val hashIndex = i | (j & (mask ^ mask2))
-              val newIndex = (-1-(arrayIndex | (j & mask))).asInstanceOf[Byte]
-              indexTable (hashIndex) = newIndex
               if (hashIndex == i) {
                 if (next1 < 0) indexTable (len + arrayIndex) = next1
-                next1 = newIndex
+                next1 = (-1-(arrayIndex | (j & mask))).asInstanceOf[Byte]
               } else {
                 if (next2 < 0) indexTable (len + arrayIndex) = next2
-                next2 = newIndex
+                next2 = (-1-(arrayIndex | (j & mask))).asInstanceOf[Byte]
               }
               // if (null ne callback) callback(arrayIndex, arrayIndex)
               j = -1-index2(size2 + arrayIndex)
             }
+            if (next1 < 0) indexTable (i) = next1
+            if (next2 < 0) indexTable (i | (mask ^ mask2)) = next2
             i += 1
           }
         } else
@@ -693,18 +693,18 @@ private final object FixedHashSet {
             while (j >= 0) {
               val arrayIndex = j & (size2-1)
               val hashIndex = i | (j & (mask ^ mask2))
-              val newIndex = (-1-(arrayIndex | (j & mask))).asInstanceOf[Short]
-              indexTable (hashIndex) = newIndex
               if (hashIndex == i) {
                 if (next1 < 0) indexTable (len + arrayIndex) = next1
-                next1 = newIndex
+                next1 = (-1-(arrayIndex | (j & mask))).asInstanceOf[Short]
               } else {
                 if (next2 < 0) indexTable (len + arrayIndex) = next2
-                next2 = newIndex
+                next2 = (-1-(arrayIndex | (j & mask))).asInstanceOf[Short]
               }
               // if (null ne callback) callback(arrayIndex, arrayIndex)
               j = -1-index2(size2 + arrayIndex)
             }
+            if (next1 < 0) indexTable (i) = next1
+            if (next2 < 0) indexTable (i | (mask ^ mask2)) = next2
             i += 1
           }
         } else
@@ -816,18 +816,18 @@ private final object FixedHashSet {
             while (j >= 0) {
               val arrayIndex = j & (size2-1)
               val hashIndex = i | (j & (mask ^ mask2))
-              val newIndex = -1-(arrayIndex | (j & mask))
-              indexTable (hashIndex) = newIndex
               if (hashIndex == i) {
                 if (next1 < 0) indexTable (len + arrayIndex) = next1
-                next1 = newIndex
+                next1 = -1-(arrayIndex | (j & mask))
               } else {
                 if (next2 < 0) indexTable (len + arrayIndex) = next2
-                next2 = newIndex
+                next2 = -1-(arrayIndex | (j & mask))
               }
               // if (null ne callback) callback(arrayIndex, arrayIndex)
               j = -1-index2(size2 + arrayIndex)
             }
+            if (next1 < 0) indexTable (i) = next1
+            if (next2 < 0) indexTable (i | (mask ^ mask2)) = next2
             i += 1
           }
         } else
@@ -939,18 +939,18 @@ private final object FixedHashSet {
             while (j >= 0) {
               val arrayIndex = j & (size2-1)
               val hashIndex = i | (j & (mask ^ mask2))
-              val newIndex = -1-(arrayIndex | (j & mask))
-              indexTable (hashIndex) = newIndex
               if (hashIndex == i) {
                 if (next1 < 0) indexTable (len + arrayIndex) = next1
-                next1 = newIndex
+                next1 = -1-(arrayIndex | (j & mask))
               } else {
                 if (next2 < 0) indexTable (len + arrayIndex) = next2
-                next2 = newIndex
+                next2 = -1-(arrayIndex | (j & mask))
               }
               // if (null ne callback) callback(arrayIndex, arrayIndex)
               j = -1-index2(size2 + arrayIndex)
             }
+            if (next1 < 0) indexTable (i) = next1
+            if (next2 < 0) indexTable (i | (mask ^ mask2)) = next2
             i += 1
           }
         } else if (array2.isInstanceOf[BoxedObjectArray]) {
