@@ -158,4 +158,25 @@ class CompactHashMapTest {
     for (i <- 0 until array.length) assertEquals (array(i), a2(i))
     assertEquals (array.toList, map.toList)
   }
+
+  @Test def testIOU {
+    val map = CompactHashMap (classOf[String], classOf[Int], 40000)
+    List("a", "b", "a", "test", null, "alex", "b", "alex", null, "alex") foreach {
+      s => map insertOrUpdateV (s, 1, _ + 1)
+    }
+    assertEquals (5, map.size)
+    assertEquals (2, map("a"))
+    assertEquals (2, map("b"))
+    assertEquals (1, map("test"))
+    assertEquals (2, map(null))
+    assertEquals (3, map("alex"))
+    map -= null
+    assertEquals (None, map.get(null))
+    map -= "alex"
+    assertEquals (None, map.get("alex"))
+    map insertOrUpdateV (null, 10, _ + 10)
+    assertEquals (10, map(null))
+    map insertOrUpdateV (null, 10, _ + 10)
+    assertEquals (20, map(null))
+  }
 }

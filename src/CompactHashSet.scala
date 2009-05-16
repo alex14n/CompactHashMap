@@ -260,9 +260,21 @@ private abstract class FixedHashSet[T] (
     val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
     val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
     val i = hc & (arrayLength - 1)
-    val next = firstIndex (i)
-    setFirstIndex (i, newIndex | (hc & hcBitmask))
-    setNextIndex (newIndex, if (next < 0) -2 else next)
+    // Sorry, it was a test if inheritance instead of association will work...
+    getIndexArray match {
+      case ia: Array[Int] =>
+        val next = ia (i)
+        ia (i) = -1-(newIndex | (hc & hcBitmask))
+        ia (arrayLength + newIndex) = if (next < 0) next else 1
+      case ia: Array[Short] =>
+        val next = ia (i)
+        ia (i) = (-1-(newIndex | (hc & hcBitmask))).asInstanceOf[Short]
+        ia (arrayLength + newIndex) = if (next < 0) next else 1
+      case ia: Array[Byte] =>
+        val next = ia (i)
+        ia (i) = (-1-(newIndex | (hc & hcBitmask))).asInstanceOf[Byte]
+        ia (arrayLength + newIndex) = if (next < 0) next else 1
+    }
     array(newIndex) = elem
     newIndex
   }
@@ -551,13 +563,21 @@ private final object FixedHashSet {
           val index2 = that.getIndexArray.asInstanceOf[Array[Byte]]
           while (i < size2) {
             var j = -1-index2(i)
+            var next1: Byte = 0
+            var next2: Byte = 0
             while (j >= 0) {
               val arrayIndex = j & (size2-1)
               val hashIndex = i | (j & (mask ^ mask2))
-              val next = indexTable(hashIndex)
-              indexTable (hashIndex) = (-1-(arrayIndex | (j & mask))).asInstanceOf[Byte]
-              if (next < 0) indexTable (len + arrayIndex) = next
-              if (null ne callback) callback(arrayIndex, arrayIndex)
+              val newIndex = (-1-(arrayIndex | (j & mask))).asInstanceOf[Byte]
+              indexTable (hashIndex) = newIndex
+              if (hashIndex == i) {
+                if (next1 < 0) indexTable (len + arrayIndex) = next1
+                next1 = newIndex
+              } else {
+                if (next2 < 0) indexTable (len + arrayIndex) = next2
+                next2 = newIndex
+              }
+              // if (null ne callback) callback(arrayIndex, arrayIndex)
               j = -1-index2(size2 + arrayIndex)
             }
             i += 1
@@ -668,13 +688,21 @@ private final object FixedHashSet {
           val index2 = that.getIndexArray.asInstanceOf[Array[Short]]
           while (i < size2) {
             var j = -1-index2(i)
+            var next1: Short = 0
+            var next2: Short = 0
             while (j >= 0) {
               val arrayIndex = j & (size2-1)
               val hashIndex = i | (j & (mask ^ mask2))
-              val next = indexTable(hashIndex)
-              indexTable (hashIndex) = (-1-(arrayIndex | (j & mask))).asInstanceOf[Short]
-              if (next < 0) indexTable (len + arrayIndex) = next
-              if (null ne callback) callback(arrayIndex, arrayIndex)
+              val newIndex = (-1-(arrayIndex | (j & mask))).asInstanceOf[Short]
+              indexTable (hashIndex) = newIndex
+              if (hashIndex == i) {
+                if (next1 < 0) indexTable (len + arrayIndex) = next1
+                next1 = newIndex
+              } else {
+                if (next2 < 0) indexTable (len + arrayIndex) = next2
+                next2 = newIndex
+              }
+              // if (null ne callback) callback(arrayIndex, arrayIndex)
               j = -1-index2(size2 + arrayIndex)
             }
             i += 1
@@ -783,13 +811,21 @@ private final object FixedHashSet {
           val index2 = that.getIndexArray.asInstanceOf[Array[Int]]
           while (i < size2) {
             var j = -1-index2(i)
+            var next1 = 0
+            var next2 = 0
             while (j >= 0) {
               val arrayIndex = j & (size2-1)
               val hashIndex = i | (j & (mask ^ mask2))
-              val next = indexTable(hashIndex)
-              indexTable (hashIndex) = -1-(arrayIndex | (j & mask))
-              if (next < 0) indexTable (len + arrayIndex) = next
-              if (null ne callback) callback(arrayIndex, arrayIndex)
+              val newIndex = -1-(arrayIndex | (j & mask))
+              indexTable (hashIndex) = newIndex
+              if (hashIndex == i) {
+                if (next1 < 0) indexTable (len + arrayIndex) = next1
+                next1 = newIndex
+              } else {
+                if (next2 < 0) indexTable (len + arrayIndex) = next2
+                next2 = newIndex
+              }
+              // if (null ne callback) callback(arrayIndex, arrayIndex)
               j = -1-index2(size2 + arrayIndex)
             }
             i += 1
@@ -898,13 +934,21 @@ private final object FixedHashSet {
           val index2 = that.getIndexArray.asInstanceOf[Array[Int]]
           while (i < size2) {
             var j = -1-index2(i)
+            var next1 = 0
+            var next2 = 0
             while (j >= 0) {
               val arrayIndex = j & (size2-1)
               val hashIndex = i | (j & (mask ^ mask2))
-              val next = indexTable(hashIndex)
-              indexTable (hashIndex) = -1-(arrayIndex | (j & mask))
-              if (next < 0) indexTable (len + arrayIndex) = next
-              if (null ne callback) callback(arrayIndex, arrayIndex)
+              val newIndex = -1-(arrayIndex | (j & mask))
+              indexTable (hashIndex) = newIndex
+              if (hashIndex == i) {
+                if (next1 < 0) indexTable (len + arrayIndex) = next1
+                next1 = newIndex
+              } else {
+                if (next2 < 0) indexTable (len + arrayIndex) = next2
+                next2 = newIndex
+              }
+              // if (null ne callback) callback(arrayIndex, arrayIndex)
               j = -1-index2(size2 + arrayIndex)
             }
             i += 1
