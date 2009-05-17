@@ -161,15 +161,16 @@ class CompactHashMapTest {
 
   @Test def testIOU {
     val map = CompactHashMap (classOf[String], classOf[Int], 40000)
-    List("a", "b", "a", "test", null, "alex", "b", "alex", null, "alex") foreach {
+    List("", "a", "b", "", "a", "test", null, "alex", "b", "alex", null, "alex", "") foreach {
       s => map insertOrUpdateV (s, 1, _ + 1)
     }
-    assertEquals (5, map.size)
+    assertEquals (6, map.size)
     assertEquals (2, map("a"))
     assertEquals (2, map("b"))
     assertEquals (1, map("test"))
     assertEquals (2, map(null))
     assertEquals (3, map("alex"))
+    assertEquals (3, map(""))
     map -= null
     assertEquals (None, map.get(null))
     map -= "alex"
@@ -178,5 +179,6 @@ class CompactHashMapTest {
     assertEquals (10, map(null))
     map insertOrUpdateV (null, 10, _ + 10)
     assertEquals (20, map(null))
+    assertEquals (3, map(""))
   }
 }
