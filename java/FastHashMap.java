@@ -188,8 +188,8 @@ implements Cloneable // Map<K,V> // Serializable
         int newIndex;
         if (firstDeletedIndex >= 0) {
             newIndex = firstDeletedIndex;
-            firstDeletedIndex = myIndices[firstDeletedIndex];
-            if (firstDeletedIndex > 1)
+            firstDeletedIndex = myIndices[hashLen+firstDeletedIndex];
+            if (firstDeletedIndex >= 2)
                 firstDeletedIndex -= 2;
             else
                 firstDeletedIndex = -1;
@@ -197,10 +197,10 @@ implements Cloneable // Map<K,V> // Serializable
             newIndex = firstEmptyIndex;
             firstEmptyIndex++;
         }
-        myIndices[i] = ~(newIndex | hcBits);
-        myIndices[hashLen + newIndex] = next < 0 ? next : 1;
-        myKeys[newIndex] = key;
         myValues[newIndex] = value;
+        myKeys[newIndex] = key;
+        myIndices[hashLen + newIndex] = next < 0 ? next : 1;
+        myIndices[i] = ~(newIndex | hcBits);
         counter++;
         return null;
     }
@@ -221,9 +221,9 @@ implements Cloneable // Map<K,V> // Serializable
       int mask = 0x7FFFFFFF ^ (hashLen-1);
       int hcBits = hc & mask;
       int prev = -1;
-      for (int i = i0; i >= 0; i = ~myIndices[prev]) {
+      for (int i = i0; i >= 0; i = ~myIndices[hashLen+prev]) {
           if (hcBits == (i & mask)) {
-              Object o = myKeys[prev];
+              Object o = myKeys[i & (hashLen-1)];
               if (o == key || o != null && o.equals(key)) {
                   i &= hashLen - 1;
                   counter--;
