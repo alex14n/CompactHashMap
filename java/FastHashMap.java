@@ -2,7 +2,8 @@ import java.util.*;
 import java.io.Serializable;
 
 public class FastHashMap<K,V>
-implements Cloneable // Map<K,V> // Serializable
+    extends AbstractMap<K,V>
+    implements Cloneable, Serializable, Map<K,V>
 {
     /**
      * The default initial capacity - MUST be a power of two.
@@ -22,8 +23,8 @@ implements Cloneable // Map<K,V> // Serializable
     final float loadFactor;
 
     /**
-     * Applies a supplemental hash function to a given hashCode, which
-     * defends against poor quality hash functions.  This is critical
+     * Applies a supplemental hash function to a given object's hashCode,
+     * which defends against poor quality hash functions. This is critical
      * because HashMap uses power-of-two length hash tables, that
      * otherwise encounter collisions for hashCodes that do not differ
      * in lower bits. Note: Null keys always map to hash 0, thus index 0.
@@ -91,7 +92,7 @@ implements Cloneable // Map<K,V> // Serializable
         this(initialCapacity, DEFAULT_LOAD_FACTOR);
     }
 
-    private void resize() {
+    final private void resize() {
         int newHashLen = hashLen << 1;
         int newValueLen = (int)(newHashLen * loadFactor);
         Object[] newKeys = new Object[newValueLen];
@@ -130,7 +131,7 @@ implements Cloneable // Map<K,V> // Serializable
         myIndices = newIndices;
     }
 
-    private int positionOf(Object elem) {
+    final private int positionOf(Object elem) {
         int hc = hash(elem);
         int mask = 0x7FFFFFFF ^ (hashLen-1);
         int hcBits = hc & mask;
@@ -144,6 +145,11 @@ implements Cloneable // Map<K,V> // Serializable
                 return i & (hashLen-1);
         }
         return -1;
+    }
+
+    final private boolean isEmpty(int i) {
+        int next = myIndices[hashLen+i];
+        return next == 0 || next >= 2;
     }
 
     /**
@@ -164,7 +170,7 @@ implements Cloneable // Map<K,V> // Serializable
         int next = myIndices[i];
         int mask = 0x7FFFFFFF ^ (hashLen-1);
         int hcBits = hc & mask;
-        //
+        // Look if key is already in this map
         int k;
         for (int j = ~next; j >= 0; j = ~myIndices[hashLen+k]) {
             k = j & (hashLen - 1);
@@ -177,7 +183,7 @@ implements Cloneable // Map<K,V> // Serializable
                 }
             }
         }
-        //
+        // Resize if needed
         if (counter >= valueLen) {
             resize();
             i = hc & (hashLen - 1);
@@ -185,6 +191,7 @@ implements Cloneable // Map<K,V> // Serializable
             mask = 0x7FFFFFFF ^ (hashLen-1);
             hcBits = hc & mask;
         }
+        // Find a place for new element
         int newIndex;
         if (firstDeletedIndex >= 0) {
             newIndex = firstDeletedIndex;
@@ -197,6 +204,7 @@ implements Cloneable // Map<K,V> // Serializable
             newIndex = firstEmptyIndex;
             firstEmptyIndex++;
         }
+        // Insert it
         myValues[newIndex] = value;
         myKeys[newIndex] = key;
         myIndices[hashLen + newIndex] = next < 0 ? next : 1;
@@ -215,41 +223,48 @@ implements Cloneable // Map<K,V> // Serializable
      *         previously associated <tt>null</tt> with <tt>key</tt>.)
      */
     public V remove(Object key) {
-      int hc = hash(key);
-      int h = hc & (hashLen-1);
-      int i0 = ~myIndices[h];
-      int mask = 0x7FFFFFFF ^ (hashLen-1);
-      int hcBits = hc & mask;
-      int prev = -1;
-      for (int i = i0; i >= 0; i = ~myIndices[hashLen+prev]) {
-          if (hcBits == (i & mask)) {
-              Object o = myKeys[i & (hashLen-1)];
-              if (o == key || o != null && o.equals(key)) {
-                  i &= hashLen - 1;
-                  counter--;
-                  if (prev >= 0)
-                      myIndices[hashLen+prev] = myIndices[hashLen+i];
-                  else
-                      myIndices[h] = myIndices[hashLen+i];
-                  if (i == firstEmptyIndex-1) {
-                      firstEmptyIndex = i;
-                      myIndices[hashLen+i] = 0;
-                  } else if (firstDeletedIndex == hashLen-2) {
-                      myIndices[hashLen+i] = myIndices[hashLen+firstDeletedIndex];
-                      myIndices[hashLen+firstDeletedIndex] = i+2;
-                  } else {
-                      myIndices[hashLen+i] = firstDeletedIndex < 0 ? 0 : firstDeletedIndex+2;
-                      firstDeletedIndex = i;
-                  }
-                  Object oldValue = myValues[i];
-                  myKeys[i] = null;
-                  myValues[i] = null;
-                  return (V)oldValue;
-              }
-          }
-          prev = i & (hashLen - 1);
-      }
-      return null;
+      V result = removeKey(key);
+      return result == NotFound ? null : result;
+    }
+
+    private static Object NotFound = new Object();
+
+    final private V removeKey(Object key) {
+        int hc = hash(key);
+        int h = hc & (hashLen-1);
+        int i0 = ~myIndices[h];
+        int mask = 0x7FFFFFFF ^ (hashLen-1);
+        int hcBits = hc & mask;
+        int prev = -1;
+        for (int i = i0; i >= 0; i = ~myIndices[hashLen+prev]) {
+            if (hcBits == (i & mask)) {
+                Object o = myKeys[i & (hashLen-1)];
+                if (o == key || o != null && o.equals(key)) {
+                    i &= hashLen - 1;
+                    counter--;
+                    if (prev >= 0)
+                        myIndices[hashLen+prev] = myIndices[hashLen+i];
+                    else
+                        myIndices[h] = myIndices[hashLen+i];
+                    if (i == firstEmptyIndex-1) {
+                        firstEmptyIndex = i;
+                        myIndices[hashLen+i] = 0;
+                    } else if (firstDeletedIndex == hashLen-2) {
+                        myIndices[hashLen+i] = myIndices[hashLen+firstDeletedIndex];
+                        myIndices[hashLen+firstDeletedIndex] = i+2;
+                    } else {
+                        myIndices[hashLen+i] = firstDeletedIndex < 0 ? 0 : firstDeletedIndex+2;
+                        firstDeletedIndex = i;
+                    }
+                    Object oldValue = myValues[i];
+                    myKeys[i] = null;
+                    myValues[i] = null;
+                    return (V)oldValue;
+                }
+            }
+            prev = i & (hashLen - 1);
+        }
+        return (V)NotFound;
     }
 
     /**
@@ -343,10 +358,9 @@ implements Cloneable // Map<K,V> // Serializable
      * @throws NullPointerException if the specified map is null
      */
     public void putAll(Map<? extends K, ? extends V> m) {
-        for (Iterator<? extends Map.Entry<? extends K, ? extends V>> i = m.entrySet().iterator(); i.hasNext(); ) {
-            Map.Entry<? extends K, ? extends V> e = i.next();
+        // ToDo: resize if needed
+        for (Map.Entry<? extends K, ? extends V> e : m.entrySet())
             put(e.getKey(), e.getValue());
-        }
     }
 
     /**
@@ -368,4 +382,189 @@ implements Cloneable // Map<K,V> // Serializable
         }
         return false;
     }
+
+    private static final long serialVersionUID = 14L;
+
+    /**
+     * Each of these fields are initialized to contain an instance of the
+     * appropriate view the first time this view is requested.  The views are
+     * stateless, so there's no reason to create more than one of each.
+     */
+    private transient volatile Set<K> keySet = null;
+    private transient volatile Collection<V> values = null;
+    private transient volatile Set<Map.Entry<K,V>> entrySet = null;
+
+    /**
+     * Returns a {@link Set} view of the keys contained in this map.
+     * The set is backed by the map, so changes to the map are
+     * reflected in the set, and vice-versa.  If the map is modified
+     * while an iteration over the set is in progress (except through
+     * the iterator's own <tt>remove</tt> operation), the results of
+     * the iteration are undefined.  The set supports element removal,
+     * which removes the corresponding mapping from the map, via the
+     * <tt>Iterator.remove</tt>, <tt>Set.remove</tt>,
+     * <tt>removeAll</tt>, <tt>retainAll</tt>, and <tt>clear</tt>
+     * operations.  It does not support the <tt>add</tt> or <tt>addAll</tt>
+     * operations.
+     */
+    public Set<K> keySet() {
+        Set<K> ks = keySet;
+        return (ks != null ? ks : (keySet = new KeySet()));
+    }
+
+    private abstract class HashIterator<E> implements Iterator<E> {
+        protected int i = 0;
+        protected Object last = NotFound;
+        public final boolean hasNext() {
+            while (i < firstEmptyIndex && isEmpty(i)) i++;
+            return i < firstEmptyIndex;
+        }
+        public final E next() {
+            while (i < firstEmptyIndex && isEmpty(i)) i++;
+            if (i < firstEmptyIndex) {
+                last = myKeys[i];
+                i++;
+                return value();
+            }
+            else throw new NoSuchElementException();
+        }
+        public final void remove() {
+            if (last == NotFound)
+                throw new IllegalStateException();
+            else {
+                removeKey(last);
+                last = NotFound;
+            }
+        }
+        protected abstract E value();
+    }
+
+    private final class KeyIterator extends HashIterator<K> {
+        protected K value() {
+            return (K)last;
+        }
+    }
+
+    private final class KeySet extends AbstractSet<K> {
+        public Iterator<K> iterator() {
+            return new KeyIterator();
+        }
+        public int size() {
+            return counter;
+        }
+        public boolean isEmpty() {
+            return counter == 0;
+        }
+        public boolean contains(Object o) {
+            return containsKey(o);
+        }
+        public boolean remove(Object o) {
+            return FastHashMap.this.removeKey(o) != NotFound;
+        }
+        public void clear() {
+          FastHashMap.this.clear();
+        }
+    }
+
+    /**
+     * Returns a {@link Set} view of the mappings contained in this map.
+     * The set is backed by the map, so changes to the map are
+     * reflected in the set, and vice-versa.  If the map is modified
+     * while an iteration over the set is in progress (except through
+     * the iterator's own <tt>remove</tt> operation, or through the
+     * <tt>setValue</tt> operation on a map entry returned by the
+     * iterator) the results of the iteration are undefined.  The set
+     * supports element removal, which removes the corresponding
+     * mapping from the map, via the <tt>Iterator.remove</tt>,
+     * <tt>Set.remove</tt>, <tt>removeAll</tt>, <tt>retainAll</tt> and
+     * <tt>clear</tt> operations.  It does not support the
+     * <tt>add</tt> or <tt>addAll</tt> operations.
+     *
+     * @return a set view of the mappings contained in this map
+     */
+    public Set<Map.Entry<K,V>> entrySet() {
+        Set<Map.Entry<K,V>> es = entrySet;
+        return es != null ? es : (entrySet = new EntrySet());
+    }
+
+    private final class EntryIterator extends HashIterator<Map.Entry<K,V>> {
+        protected Map.Entry<K,V> value() {
+            return new AbstractMap.SimpleEntry((K)last, (V)myValues[i]);
+        }
+    }
+
+    private final class EntrySet extends AbstractSet<Map.Entry<K,V>> {
+        public Iterator<Map.Entry<K,V>> iterator() {
+            return new EntryIterator();
+        }
+        public boolean contains(Object o) {
+            if (!(o instanceof Map.Entry))
+                return false;
+            Map.Entry<K,V> e = (Map.Entry<K,V>) o;
+            int i = positionOf(e.getKey());
+            if (i < 0) return false;
+            Object v1 = myValues[i];
+            Object v2 = e.getValue();
+            return v1 == v2 || v1 != null && v1.equals(v2);
+        }
+        public boolean remove(Object o) {
+            if (!contains(o)) return false;
+            removeKey(((Map.Entry<K,V>)o).getKey());
+            return true;
+        }
+        public int size() {
+            return counter;
+        }
+        public boolean isEmpty() {
+            return counter == 0;
+        }
+        public void clear() {
+            FastHashMap.this.clear();
+        }
+    }
+
+    /**
+     * Returns a {@link Collection} view of the values contained in this map.
+     * The collection is backed by the map, so changes to the map are
+     * reflected in the collection, and vice-versa.  If the map is
+     * modified while an iteration over the collection is in progress
+     * (except through the iterator's own <tt>remove</tt> operation),
+     * the results of the iteration are undefined.  The collection
+     * supports element removal, which removes the corresponding
+     * mapping from the map, via the <tt>Iterator.remove</tt>,
+     * <tt>Collection.remove</tt>, <tt>removeAll</tt>,
+     * <tt>retainAll</tt> and <tt>clear</tt> operations.  It does not
+     * support the <tt>add</tt> or <tt>addAll</tt> operations.
+     */
+    public Collection<V> values() {
+        Collection<V> vs = values;
+        return (vs != null ? vs : (values = new Values()));
+    }
+
+    private final class ValueIterator extends HashIterator<V> {
+        protected V value() {
+            return (V)myValues[i];
+        }
+    }
+
+    private final class Values extends AbstractCollection<V> {
+        public Iterator<V> iterator() {
+            return new ValueIterator();
+        }
+        public int size() {
+            return counter;
+        }
+        public boolean isEmpty() {
+            return counter == 0;
+        }
+        public boolean contains(Object o) {
+            return containsValue(o);
+        }
+        public void clear() {
+            FastHashMap.this.clear();
+        }
+    }
+
+    // ToDo: readObject
+    // ToDo: writeObject
 }

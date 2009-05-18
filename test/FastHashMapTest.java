@@ -1,3 +1,4 @@
+import java.util.*;
 import org.junit.*;
 import static org.junit.Assert.*;
 
@@ -10,24 +11,43 @@ public class FastHashMapTest {
     assertEquals (0, map.size());
 
     assertEquals (null, map.get(null));
+    assertFalse(map.containsValue(null));
+    assertFalse(map.containsValue("null"));
     assertEquals (null, map.put(null, "null"));
     assertEquals (1, map.size());
+    assertFalse(map.containsValue(null));
+    assertTrue(map.containsValue("null"));
+    assertFalse(map.containsValue("test"));
     assertEquals ("null", map.get(null));
     assertEquals ("null", map.put(null, "test"));
     assertEquals (1, map.size());
     assertEquals ("test", map.get(null));
+    assertFalse(map.containsValue(null));
+    assertFalse(map.containsValue("null"));
+    assertTrue(map.containsValue("test"));
 
     assertEquals (null, map.get("null"));
     assertEquals (null, map.put("null", null));
     assertEquals (2, map.size());
+    assertTrue(map.containsValue(null));
+    assertFalse(map.containsValue("null"));
+    assertTrue(map.containsValue("test"));
     assertEquals (null, map.get("null"));
     assertEquals (null, map.put("null", "test"));
     assertEquals (2, map.size());
     assertEquals ("test", map.get("null"));
+    assertFalse(map.containsValue(null));
+    assertFalse(map.containsValue("null"));
+    assertTrue(map.containsValue("test"));
   }
 
   @Test public void testRemove () {
     FastHashMap<String,String> map = new FastHashMap<String,String> ();
+    assertEquals(null, map.remove(null));
+    assertEquals(null, map.remove("test"));
+    assertEquals(null, map.remove(""));
+    assertTrue(map.isEmpty());
+
     for (int i = 0; i < 20; i++) {
       map.put("a"+i, i+"x");
       map.put("b"+i, i+"y");
@@ -64,5 +84,43 @@ public class FastHashMapTest {
       assertEquals("("+i+")", map.get("d"+i));
     for (int i = 0; i < 20; i++)
       assertEquals(i+"z", map.get("c"+i));
+
+    assertEquals(50,map.size());
+    assertEquals(null, map.remove(null));
+    assertEquals(null, map.remove("test"));
+    assertEquals(null, map.remove(""));
+    assertEquals(50,map.size());
+  }
+
+  @Test public void testKeySet () {
+    FastHashMap<String,String> map = new FastHashMap<String,String> ();
+    map.put("a", "1");
+    map.put("b", "2");
+    map.put("c", "3");
+    map.put("d", "4");
+    map.put("e", "5");
+
+    Iterator<String> i = map.keySet().iterator();
+    assertEquals(5, map.size());
+    assertTrue(i.hasNext());
+    assertEquals("a",i.next());
+    assertTrue(i.hasNext());
+    assertEquals("b",i.next());
+    i.remove();
+    assertTrue(i.hasNext());
+    assertEquals("c",i.next());
+    assertTrue(i.hasNext());
+    assertEquals("d",i.next());
+    i.remove();
+    assertTrue(i.hasNext());
+    assertEquals("e",i.next());
+    assertFalse(i.hasNext());
+
+    assertEquals(3, map.size());
+    assertEquals("1", map.get("a"));
+    assertFalse(map.containsKey("b"));
+    assertEquals("3", map.get("c"));
+    assertFalse(map.containsKey("d"));
+    assertEquals("5", map.get("e"));
   }
 }
