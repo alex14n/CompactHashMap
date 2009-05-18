@@ -123,4 +123,36 @@ public class FastHashMapTest {
     assertFalse(map.containsKey("d"));
     assertEquals("5", map.get("e"));
   }
+
+  @Test public void testValues () {
+    FastHashMap<String,String> map = new FastHashMap<String,String> ();
+    map.put("a", "1");
+    map.put("b", "2");
+    map.put("c", "3");
+    map.put("d", "4");
+    map.put("e", "5");
+
+    Iterator<String> i = map.values().iterator();
+    assertEquals(5, map.size());
+    assertTrue(i.hasNext());
+    assertEquals("1",i.next());
+    assertTrue(i.hasNext());
+    assertEquals("2",i.next());
+    i.remove();
+    assertTrue(i.hasNext());
+    assertEquals("3",i.next());
+    assertTrue(i.hasNext());
+    assertEquals("4",i.next());
+    i.remove();
+    assertTrue(i.hasNext());
+    assertEquals("5",i.next());
+    assertFalse(i.hasNext());
+
+    assertEquals(3, map.size());
+    assertEquals("1", map.get("a"));
+    assertFalse(map.containsKey("b"));
+    assertEquals("3", map.get("c"));
+    assertFalse(map.containsKey("d"));
+    assertEquals("5", map.get("e"));
+  }
 }

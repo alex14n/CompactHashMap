@@ -414,7 +414,8 @@ public class FastHashMap<K,V>
 
     private abstract class HashIterator<E> implements Iterator<E> {
         protected int i = 0;
-        protected Object last = NotFound;
+        protected Object lastKey = NotFound;
+        protected Object lastValue = NotFound;
         public final boolean hasNext() {
             while (i < firstEmptyIndex && isEmpty(i)) i++;
             return i < firstEmptyIndex;
@@ -422,18 +423,20 @@ public class FastHashMap<K,V>
         public final E next() {
             while (i < firstEmptyIndex && isEmpty(i)) i++;
             if (i < firstEmptyIndex) {
-                last = myKeys[i];
+                lastKey = myKeys[i];
+                lastValue = myValues[i];
                 i++;
                 return value();
             }
             else throw new NoSuchElementException();
         }
         public final void remove() {
-            if (last == NotFound)
+            if (lastKey == NotFound)
                 throw new IllegalStateException();
             else {
-                removeKey(last);
-                last = NotFound;
+                removeKey(lastKey);
+                lastKey = NotFound;
+                lastValue = NotFound;
             }
         }
         protected abstract E value();
@@ -441,7 +444,7 @@ public class FastHashMap<K,V>
 
     private final class KeyIterator extends HashIterator<K> {
         protected K value() {
-            return (K)last;
+            return (K)lastKey;
         }
     }
 
@@ -489,7 +492,7 @@ public class FastHashMap<K,V>
 
     private final class EntryIterator extends HashIterator<Map.Entry<K,V>> {
         protected Map.Entry<K,V> value() {
-            return new AbstractMap.SimpleEntry((K)last, (V)myValues[i]);
+            return new AbstractMap.SimpleEntry((K)lastKey, (V)lastValue);
         }
     }
 
@@ -543,7 +546,7 @@ public class FastHashMap<K,V>
 
     private final class ValueIterator extends HashIterator<V> {
         protected V value() {
-            return (V)myValues[i];
+            return (V)lastValue;
         }
     }
 
