@@ -8,21 +8,22 @@ final class HashCached (final val i: Int) {
 
 object Benchmark {
   private[this] val iterations = 1500000
-
+/*
   type T = String
   private[this] val values = (1 to iterations*2).toList map { x => "_test_"+x } toArray
-/*
+
   type T = HashCached
   private[this] val values = (1 to iterations*2).toList map { x => new HashCached(100000+x*123) } toArray
-
+*/
   type T = Int
   private[this] val values = (1 to iterations*2).toList.toArray
-*/
+
   private[this] var compactMap: CompactHashMap[T,T] = _ // CompactHashMap (classOf[T], classOf[T], iterations)
   private[this] var scalaMap: scala.collection.mutable.HashMap[T,T] = _
   private[this] var javaMap: java.util.HashMap[T,T] = _ // new java.util.HashMap (iterations)
   private[this] var fastMap: FastHashMap[T,T] = _
   private[this] var troveMap: gnu.trove.THashMap[T,T] = _
+  private[this] var troveIntMap: gnu.trove.TIntIntHashMap = _
 
   private[this] val rt = Runtime.getRuntime()
 
@@ -77,6 +78,15 @@ object Benchmark {
     var i = 1
     while (i < iterations) {
       troveMap put (values(i), values(2*iterations-i))
+      i += 1
+    }
+  }
+
+  def troveIntWrite {
+    troveIntMap = new gnu.trove.TIntIntHashMap // (iterations)
+    var i = 1
+    while (i < iterations) {
+      troveIntMap put (i, 2*iterations-i)
       i += 1
     }
   }
@@ -166,6 +176,23 @@ object Benchmark {
     }
     troveMap = null
   }
+
+  def troveIntReadFull {
+    var i = 1
+    while (i < iterations) {
+      assert (troveIntMap.get(i) == 2*iterations-i)
+      i += 1
+    }
+  }
+
+  def troveIntReadEmpty {
+    var i = iterations
+    while (i < 2*iterations) {
+      assert (! troveIntMap.containsKey(i))
+      i += 1
+    }
+    troveIntMap = null
+  }
 /*
   def oldFilter {
     CompactHashMap (classOf[Int], classOf[Int]) ++
@@ -177,19 +204,24 @@ object Benchmark {
   }
 */
   val tests: List[(String,()=>Unit)] = List(
+/*
     "fastWrite" -> fastWrite _,
     "fastReadFull" -> fastReadFull _,
     "fastReadEmpty" -> fastReadEmpty _,
     "javaWrite" -> javaWrite _,
     "javaReadFull" -> javaReadFull _,
     "javaReadEmpty" -> javaReadEmpty _,
-/*
     "troveWrite" -> troveWrite _,
     "troveReadFull" -> troveReadFull _,
     "troveReadEmpty" -> troveReadEmpty _,
+*/
+    "troveIntWrite" -> troveIntWrite _,
+    "troveIntReadFull" -> troveIntReadFull _,
+    "troveIntReadEmpty" -> troveIntReadEmpty _,
     "compactWrite" -> compactWrite _,
     "compactReadFull" -> compactReadFull _,
     "compactReadEmpty" -> compactReadEmpty _,
+/*
     "scalaWrite" -> scalaWrite _,
     "scalaReadFull" -> scalaReadFull _,
     "scalaReadEmpty" -> scalaReadEmpty _,
