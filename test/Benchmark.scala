@@ -9,16 +9,19 @@ final class HashCached (final val i: Int) {
 object Benchmark {
   private[this] val iterations = 0x170000 // 1500000
   final def intKey(i: Int) = i*123
+
+  type T = Object
+  private[this] val values = (0 to iterations*2).toList map { x => new Object } toArray
 /*
   type T = String
   private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
 
   type T = HashCached
   private[this] val values = (0 to iterations*2).toList map { x => new HashCached(100000+x*123) } toArray
-*/
+
   type T = Int
   final def values(i: Int) = intKey(i)
-
+*/
   private[this] var scalaMap: scala.collection.mutable.Map[T,T] = _
   private[this] var javaMap: java.util.Map[T,T] = _
   private[this] var troveIntMap: gnu.trove.TIntIntHashMap = _
@@ -146,17 +149,16 @@ object Benchmark {
   }
 
   val tests: List[(String,()=>Unit)] = List(
-/*
     "fastWrite" -> {() => javaWrite(new FastHashMap)},
     "fastReadFull" -> javaReadFull _,
     "fastReadEmpty" -> javaReadEmpty _,
-    "fastutilWrite" -> {() => javaWrite(new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap)},
-    "fastutilReadFull" -> javaReadFull _,
-    "fastutilReadEmpty" -> javaReadEmpty _,
     "javaWrite" -> {() => javaWrite(new java.util.HashMap)},
     "javaReadFull" -> javaReadFull _,
     "javaReadEmpty" -> javaReadEmpty _,
-*/
+/*
+    "fastutilWrite" -> {() => javaWrite(new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap)},
+    "fastutilReadFull" -> javaReadFull _,
+    "fastutilReadEmpty" -> javaReadEmpty _,
     "fastutilIntWrite" -> fastutilIntWrite _,
     "fastutilIntReadFull" -> fastutilIntReadFull _,
     "fastutilIntReadEmpty" -> fastutilIntReadEmpty _,
@@ -166,7 +168,6 @@ object Benchmark {
     "troveIntWrite" -> troveIntWrite _,
     "troveIntReadFull" -> troveIntReadFull _,
     "troveIntReadEmpty" -> troveIntReadEmpty _,
-/*
     "troveWrite" -> {() => javaWrite(new gnu.trove.THashMap)},
     "troveReadFull" -> javaReadFull _,
     "troveReadEmpty" -> javaReadEmpty _,
