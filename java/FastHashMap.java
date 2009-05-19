@@ -1,5 +1,6 @@
 import java.util.*;
 import java.io.Serializable;
+import java.lang.reflect.Array;
 
 public class FastHashMap<K,V>
     extends AbstractMap<K,V>
@@ -45,6 +46,9 @@ public class FastHashMap<K,V>
 
     private int hashLen;
     private int valueLen;
+
+    private final static int AVAILABLE_BITS = 0x3FFFFFFF;
+    private final static int NEXT_IS_EOL = 0x40000000;
 
     /**
      * Constructs an empty <tt>HashMap</tt> with the default initial capacity
@@ -96,8 +100,8 @@ public class FastHashMap<K,V>
         System.arraycopy(myKeyValues, 0, newKeyValues, 0, counter<<1);
         int[] newIndices = new int[newHashLen+newValueLen];
         Arrays.fill(newIndices, newHashLen, newHashLen+counter, 1);
-        int mask = 0x7FFFFFFF ^ (hashLen-1);
-        int newMask = 0x7FFFFFFF ^ (newHashLen-1);
+        int mask = AVAILABLE_BITS ^ (hashLen-1);
+        int newMask = AVAILABLE_BITS ^ (newHashLen-1);
         for (int i = 0; i < hashLen; i++) {
             int next1 = 0;
             int next2 = 0;
@@ -110,10 +114,10 @@ public class FastHashMap<K,V>
                 int hashIndex = i | (j & (newMask ^ mask));
                 if (hashIndex == i) {
                     if (next1 < 0) newIndices[newHashLen + arrayIndex] = next1;
-                    next1 = ~(arrayIndex | (j & newMask));
+                    next1 = ~(arrayIndex | (j & newMask) | (next1 < 0 ? 0 : NEXT_IS_EOL));
                 } else {
                     if (next2 < 0) newIndices[newHashLen + arrayIndex] = next2;
-                    next2 = ~(arrayIndex | (j & newMask));
+                    next2 = ~(arrayIndex | (j & newMask) | (next2 < 0 ? 0 : NEXT_IS_EOL));
                 }
             }
             if (next1 < 0) newIndices[i] = next1;
@@ -127,17 +131,22 @@ public class FastHashMap<K,V>
 
     final private int positionOf(Object elem) {
         int hc = hash(elem);
-        int mask = 0x7FFFFFFF ^ (hashLen-1);
+        int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
+        int prev = -1;
         for (int i = ~myIndices[hc & (hashLen-1)];
              i >= 0;
-             i = ~myIndices[hashLen + (i & (hashLen-1))])
+             i = ~myIndices[prev])
         {
-            if (hcBits != (i & mask)) continue;
-            Object x = myKeyValues[(i & (hashLen-1))<<1];
-            if (x == elem || x != null && x.equals(elem))
-                return i & (hashLen-1);
+            if (hcBits == (i & mask)) {
+                Object x = myKeyValues[(i & (hashLen-1))<<1];
+                if (x == elem || x != null && x.equals(elem))
+                    return i & (hashLen-1);
+            }
+            if ((i & NEXT_IS_EOL) != 0) return -1;
+            prev = hashLen + (i & (hashLen-1));
         }
+        if (prev >= 0) myIndices[prev] ^= NEXT_IS_EOL;
         return -1;
     }
 
@@ -162,7 +171,7 @@ public class FastHashMap<K,V>
         int hc = hash(key);
         int i = hc & (hashLen - 1);
         int next = myIndices[i];
-        int mask = 0x7FFFFFFF ^ (hashLen-1);
+        int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         // Look if key is already in this map
         int k;
@@ -176,13 +185,14 @@ public class FastHashMap<K,V>
                     return (V)oldValue;
                 }
             }
+            if ((j & NEXT_IS_EOL) != 0) break;
         }
         // Resize if needed
         if (counter >= valueLen) {
             resize();
             i = hc & (hashLen - 1);
             next = myIndices[i];
-            mask = 0x7FFFFFFF ^ (hashLen-1);
+            mask = AVAILABLE_BITS ^ (hashLen-1);
             hcBits = hc & mask;
         }
         // Find a place for new element
@@ -202,7 +212,7 @@ public class FastHashMap<K,V>
         myKeyValues[newIndex<<1] = key;
         myKeyValues[(newIndex<<1)+1] = value;
         myIndices[hashLen + newIndex] = next < 0 ? next : 1;
-        myIndices[i] = ~(newIndex | hcBits);
+        myIndices[i] = ~(newIndex | hcBits | (next < 0 ? 0 : NEXT_IS_EOL));
         counter++;
         return null;
     }
@@ -227,7 +237,7 @@ public class FastHashMap<K,V>
         int hc = hash(key);
         int h = hc & (hashLen-1);
         int i0 = ~myIndices[h];
-        int mask = 0x7FFFFFFF ^ (hashLen-1);
+        int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         int prev = -1;
         for (int i = i0; i >= 0; i = ~myIndices[hashLen+prev]) {
@@ -256,6 +266,7 @@ public class FastHashMap<K,V>
                     return (V)oldValue;
                 }
             }
+            if ((i & NEXT_IS_EOL) != 0) break;
             prev = i & (hashLen - 1);
         }
         return (V)NOT_FOUND;
@@ -327,6 +338,7 @@ public class FastHashMap<K,V>
     public V get(Object key) {
         int i = positionOf(key);
         return i >= 0 ? (V)myKeyValues[(i<<1)+1] : null;
+        // return i >= 0 ? (V)Array.get(myKeyValues,(i<<1)+1) : null;
     }
 
     /**
