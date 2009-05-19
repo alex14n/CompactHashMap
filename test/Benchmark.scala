@@ -8,6 +8,7 @@ final class HashCached (final val i: Int) {
 
 object Benchmark {
   private[this] val iterations = 0x170000 // 1500000
+  final def intKey(i: Int) = i*123
 /*
   type T = String
   private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
@@ -16,7 +17,7 @@ object Benchmark {
   private[this] val values = (0 to iterations*2).toList map { x => new HashCached(100000+x*123) } toArray
 */
   type T = Int
-  final def values(i: Int) = i
+  final def values(i: Int) = intKey(i)
 
   private[this] var scalaMap: scala.collection.mutable.Map[T,T] = _
   private[this] var javaMap: java.util.Map[T,T] = _
@@ -56,7 +57,7 @@ object Benchmark {
     troveIntMap = new gnu.trove.TIntIntHashMap
     var i = 0
     while (i < iterations) {
-      troveIntMap put (i, 2*iterations-i)
+      troveIntMap put (intKey(i), intKey(2*iterations-i))
       i += 1
     }
   }
@@ -65,7 +66,7 @@ object Benchmark {
     fastutilIntMap = new it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap
     var i = 0
     while (i < iterations) {
-      fastutilIntMap put (i, 2*iterations-i)
+      fastutilIntMap put (intKey(i), intKey(2*iterations-i))
       i += 1
     }
   }
@@ -112,7 +113,7 @@ object Benchmark {
     var i = 0
     while (i < iterations) {
       val j = reoder(i)
-      assert (troveIntMap.get(j) == 2*iterations-j)
+      assert (troveIntMap.get(intKey(j)) == intKey(2*iterations-j))
       i += 1
     }
   }
@@ -120,7 +121,7 @@ object Benchmark {
   def troveIntReadEmpty {
     var i = iterations
     while (i < 2*iterations) {
-      assert (! troveIntMap.containsKey(i))
+      assert (! troveIntMap.containsKey(intKey(i)))
       i += 1
     }
     troveIntMap = null
@@ -130,7 +131,7 @@ object Benchmark {
     var i = 0
     while (i < iterations) {
       val j = reoder(i)
-      assert (fastutilIntMap.get(j) == 2*iterations-j)
+      assert (fastutilIntMap.get(intKey(j)) == intKey(2*iterations-j))
       i += 1
     }
   }
@@ -138,7 +139,7 @@ object Benchmark {
   def fastutilIntReadEmpty {
     var i = iterations
     while (i < 2*iterations) {
-      assert (! fastutilIntMap.containsKey(i))
+      assert (! fastutilIntMap.containsKey(intKey(i)))
       i += 1
     }
     fastutilIntMap = null
