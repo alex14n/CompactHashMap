@@ -7,17 +7,17 @@ final class HashCached (final val i: Int) {
 }
 
 object Benchmark {
-  private[this] val iterations = 1500000
-/*
+  private[this] val iterations = 0x170000 // 1500000
+
   type T = String
-  private[this] val values = (1 to iterations*2).toList map { x => "_test_"+x } toArray
-
+  private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
+/*
   type T = HashCached
-  private[this] val values = (1 to iterations*2).toList map { x => new HashCached(100000+x*123) } toArray
-*/
-  type T = Int
-  private[this] val values = (1 to iterations*2).toList.toArray
+  private[this] val values = (0 to iterations*2).toList map { x => new HashCached(100000+x*123) } toArray
 
+  type T = Int
+  private[this] val values = (0 to iterations*2).toList.toArray
+*/
   private[this] var compactMap: CompactHashMap[T,T] = _ // CompactHashMap (classOf[T], classOf[T], iterations)
   private[this] var scalaMap: scala.collection.mutable.HashMap[T,T] = _
   private[this] var javaMap: java.util.HashMap[T,T] = _ // new java.util.HashMap (iterations)
@@ -38,8 +38,7 @@ object Benchmark {
 
   def compactWrite {
     compactMap = new CompactHashMap // (classOf[T], classOf[T], iterations)
-    compactMap update (null.asInstanceOf[T], null.asInstanceOf[T])
-    var i = 1
+    var i = 0
     while (i < iterations) {
       compactMap update (values(i), values(2*iterations-i))
       i += 1
@@ -48,7 +47,7 @@ object Benchmark {
 
   def scalaWrite {
     scalaMap = new scala.collection.mutable.HashMap
-    var i = 1
+    var i = 0
     while (i < iterations) {
       scalaMap update (values(i), values(2*iterations-i))
       i += 1
@@ -57,7 +56,7 @@ object Benchmark {
 
   def javaWrite {
     javaMap = new java.util.HashMap // (iterations)
-    var i = 1
+    var i = 0
     while (i < iterations) {
       javaMap put (values(i), values(2*iterations-i))
       i += 1
@@ -66,7 +65,7 @@ object Benchmark {
 
   def fastWrite {
     fastMap = new FastHashMap // (iterations)
-    var i = 1
+    var i = 0
     while (i < iterations) {
       fastMap put (values(i), values(2*iterations-i))
       i += 1
@@ -75,27 +74,29 @@ object Benchmark {
 
   def troveWrite {
     troveMap = new gnu.trove.THashMap[T,T] // (iterations)
-    var i = 1
+    var i = 0
     while (i < iterations) {
       troveMap put (values(i), values(2*iterations-i))
       i += 1
     }
   }
-
+/*
   def troveIntWrite {
     troveIntMap = new gnu.trove.TIntIntHashMap // (iterations)
-    var i = 1
+    var i = 0
     while (i < iterations) {
-      troveIntMap put (i, 2*iterations-i)
+      troveIntMap put (values(i), values(2*iterations-i))
       i += 1
     }
   }
+*/
+  final def reoder(i: Int): Int = (i & 0xFFFF0000) | ((i & 0xFF00) >>> 8) | ((i & 0xFF) << 8)
 
   def compactReadFull {
-    var i = 1
-    assert (compactMap(null.asInstanceOf[T]) == null.asInstanceOf[T])
+    var i = 0
     while (i < iterations) {
-      assert (compactMap(values(i)) == values(2*iterations-i))
+      val j = reoder(i)
+      assert (compactMap(values(j)) == values(2*iterations-j))
       i += 1
     }
   }
@@ -110,9 +111,10 @@ object Benchmark {
   }
 
   def scalaReadFull {
-    var i = 1
+    var i = 0
     while (i < iterations) {
-      assert (scalaMap(values(i)) == values(2*iterations-i))
+      val j = reoder(i)
+      assert (scalaMap(values(j)) == values(2*iterations-j))
       i += 1
     }
   }
@@ -127,9 +129,10 @@ object Benchmark {
   }
 
   def javaReadFull {
-    var i = 1
+    var i = 0
     while (i < iterations) {
-      assert (javaMap.get(values(i)) == values(2*iterations-i))
+      val j = reoder(i)
+      assert (javaMap.get(values(j)) == values(2*iterations-j))
       i += 1
     }
   }
@@ -144,9 +147,10 @@ object Benchmark {
   }
 
   def fastReadFull {
-    var i = 1
+    var i = 0
     while (i < iterations) {
-      assert (fastMap.get(values(i)) == values(2*iterations-i))
+      val j = reoder(i)
+      assert (fastMap.get(values(j)) == values(2*iterations-j))
       i += 1
     }
   }
@@ -161,9 +165,10 @@ object Benchmark {
   }
 
   def troveReadFull {
-    var i = 1
+    var i = 0
     while (i < iterations) {
-      assert (troveMap.get(values(i)) == values(2*iterations-i))
+      val j = reoder(i)
+      assert (troveMap.get(values(j)) == values(2*iterations-j))
       i += 1
     }
   }
@@ -176,11 +181,12 @@ object Benchmark {
     }
     troveMap = null
   }
-
+/*
   def troveIntReadFull {
-    var i = 1
+    var i = 0
     while (i < iterations) {
-      assert (troveIntMap.get(i) == 2*iterations-i)
+      val j = reoder(i)
+      assert (troveIntMap.get(values(j)) == values(2*iterations-j))
       i += 1
     }
   }
@@ -188,12 +194,12 @@ object Benchmark {
   def troveIntReadEmpty {
     var i = iterations
     while (i < 2*iterations) {
-      assert (! troveIntMap.containsKey(i))
+      assert (! troveIntMap.containsKey(values(i)))
       i += 1
     }
     troveIntMap = null
   }
-/*
+
   def oldFilter {
     CompactHashMap (classOf[Int], classOf[Int]) ++
       compactMap.elements.filter {x => (x._1 & 3) == 0 && x._2 < 500000}
@@ -204,24 +210,22 @@ object Benchmark {
   }
 */
   val tests: List[(String,()=>Unit)] = List(
-/*
     "fastWrite" -> fastWrite _,
     "fastReadFull" -> fastReadFull _,
     "fastReadEmpty" -> fastReadEmpty _,
     "javaWrite" -> javaWrite _,
     "javaReadFull" -> javaReadFull _,
     "javaReadEmpty" -> javaReadEmpty _,
+/*
     "troveWrite" -> troveWrite _,
     "troveReadFull" -> troveReadFull _,
     "troveReadEmpty" -> troveReadEmpty _,
-*/
     "troveIntWrite" -> troveIntWrite _,
     "troveIntReadFull" -> troveIntReadFull _,
     "troveIntReadEmpty" -> troveIntReadEmpty _,
     "compactWrite" -> compactWrite _,
     "compactReadFull" -> compactReadFull _,
     "compactReadEmpty" -> compactReadEmpty _,
-/*
     "scalaWrite" -> scalaWrite _,
     "scalaReadFull" -> scalaReadFull _,
     "scalaReadEmpty" -> scalaReadEmpty _,

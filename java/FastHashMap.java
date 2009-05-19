@@ -38,8 +38,7 @@ public class FastHashMap<K,V>
     }
 
     private int counter = 0;
-    private Object[] myKeys;
-    private Object[] myValues;
+    private Object[] myKeyValues;
     private int[] myIndices;
     private int firstEmptyIndex = 0;
     private int firstDeletedIndex = -1;
@@ -55,8 +54,7 @@ public class FastHashMap<K,V>
         loadFactor = DEFAULT_LOAD_FACTOR;
         hashLen = DEFAULT_INITIAL_CAPACITY;
         valueLen = (int)(hashLen * loadFactor);
-        myKeys = new Object[valueLen];
-        myValues = new Object[valueLen];
+        myKeyValues = new Object[valueLen<<1];
         myIndices = new int[hashLen+valueLen];
     }
 
@@ -76,8 +74,7 @@ public class FastHashMap<K,V>
              hashLen < initialCapacity;
              hashLen <<= 1);
         valueLen = (int)(hashLen * loadFactor);
-        myKeys = new Object[valueLen];
-        myValues = new Object[valueLen];
+        myKeyValues = new Object[valueLen<<1];
         myIndices = new int[hashLen+valueLen];
     }
 
@@ -95,10 +92,8 @@ public class FastHashMap<K,V>
     final private void resize() {
         int newHashLen = hashLen << 1;
         int newValueLen = (int)(newHashLen * loadFactor);
-        Object[] newKeys = new Object[newValueLen];
-        System.arraycopy(myKeys, 0, newKeys, 0, counter);
-        Object[] newValues = new Object[newValueLen];
-        System.arraycopy(myValues, 0, newValues, 0, counter);
+        Object[] newKeyValues = new Object[newValueLen<<1];
+        System.arraycopy(myKeyValues, 0, newKeyValues, 0, counter<<1);
         int[] newIndices = new int[newHashLen+newValueLen];
         Arrays.fill(newIndices, newHashLen, newHashLen+counter, 1);
         int mask = 0x7FFFFFFF ^ (hashLen-1);
@@ -126,8 +121,7 @@ public class FastHashMap<K,V>
         }
         hashLen = newHashLen;
         valueLen = newValueLen;
-        myKeys = newKeys;
-        myValues = newValues;
+        myKeyValues = newKeyValues;
         myIndices = newIndices;
     }
 
@@ -140,7 +134,7 @@ public class FastHashMap<K,V>
              i = ~myIndices[hashLen + (i & (hashLen-1))])
         {
             if (hcBits != (i & mask)) continue;
-            Object x = myKeys[i & (hashLen-1)];
+            Object x = myKeyValues[(i & (hashLen-1))<<1];
             if (x == elem || x != null && x.equals(elem))
                 return i & (hashLen-1);
         }
@@ -175,10 +169,10 @@ public class FastHashMap<K,V>
         for (int j = ~next; j >= 0; j = ~myIndices[hashLen+k]) {
             k = j & (hashLen - 1);
             if (hcBits == (j & mask)) {
-                Object o = myKeys[k];
+                Object o = myKeyValues[k<<1];
                 if (o == key || o != null && o.equals(key)) {
-                    Object oldValue = myValues[k];
-                    myValues[k] = value;
+                    Object oldValue = myKeyValues[(k<<1)+1];
+                    myKeyValues[(k<<1)+1] = value;
                     return (V)oldValue;
                 }
             }
@@ -205,8 +199,8 @@ public class FastHashMap<K,V>
             firstEmptyIndex++;
         }
         // Insert it
-        myValues[newIndex] = value;
-        myKeys[newIndex] = key;
+        myKeyValues[newIndex<<1] = key;
+        myKeyValues[(newIndex<<1)+1] = value;
         myIndices[hashLen + newIndex] = next < 0 ? next : 1;
         myIndices[i] = ~(newIndex | hcBits);
         counter++;
@@ -238,7 +232,7 @@ public class FastHashMap<K,V>
         int prev = -1;
         for (int i = i0; i >= 0; i = ~myIndices[hashLen+prev]) {
             if (hcBits == (i & mask)) {
-                Object o = myKeys[i & (hashLen-1)];
+                Object o = myKeyValues[(i & (hashLen-1))<<1];
                 if (o == key || o != null && o.equals(key)) {
                     i &= hashLen - 1;
                     counter--;
@@ -256,9 +250,9 @@ public class FastHashMap<K,V>
                         myIndices[hashLen+i] = firstDeletedIndex < 0 ? 0 : firstDeletedIndex+2;
                         firstDeletedIndex = i;
                     }
-                    Object oldValue = myValues[i];
-                    myKeys[i] = null;
-                    myValues[i] = null;
+                    Object oldValue = myKeyValues[(i<<1)+1];
+                    myKeyValues[i<<1] = null;
+                    myKeyValues[(i<<1)+1] = null;
                     return (V)oldValue;
                 }
             }
@@ -272,8 +266,7 @@ public class FastHashMap<K,V>
      * The map will be empty after this call returns.
      */
     public void clear() {
-        Arrays.fill(myKeys, 0, firstEmptyIndex, null);
-        Arrays.fill(myValues, 0, firstEmptyIndex, null);
+        Arrays.fill(myKeyValues, 0, firstEmptyIndex<<1, null);
         Arrays.fill(myIndices, 0, hashLen + firstEmptyIndex, 0);
         counter = 0;
         firstEmptyIndex = 0;
@@ -291,8 +284,7 @@ public class FastHashMap<K,V>
         that.counter = counter;
         that.firstEmptyIndex = firstEmptyIndex;
         that.firstDeletedIndex = firstDeletedIndex;
-        System.arraycopy(myKeys, 0, that.myKeys, 0, firstEmptyIndex);
-        System.arraycopy(myValues, 0, that.myValues, 0, firstEmptyIndex);
+        System.arraycopy(myKeyValues, 0, that.myKeyValues, 0, firstEmptyIndex<<1);
         System.arraycopy(myIndices, 0, that.myIndices, 0, hashLen+firstEmptyIndex);
         return that;
     }
@@ -334,7 +326,7 @@ public class FastHashMap<K,V>
      */
     public V get(Object key) {
         int i = positionOf(key);
-        return i >= 0 ? (V)myValues[i] : null;
+        return i >= 0 ? (V)myKeyValues[(i<<1)+1] : null;
     }
 
     /**
@@ -375,7 +367,7 @@ public class FastHashMap<K,V>
         for (int i = 0; i < firstEmptyIndex ; i++) {
             int next = myIndices[hashLen+i];
             if (next == 1 || next < 0) {
-                Object o = myValues[i];
+                Object o = myKeyValues[(i<<1)+1];
                 if (o == value || o != null && o.equals(value))
                     return true;
             }
@@ -423,8 +415,8 @@ public class FastHashMap<K,V>
         public final E next() {
             while (i < firstEmptyIndex && isEmpty(i)) i++;
             if (i < firstEmptyIndex) {
-                lastKey = myKeys[i];
-                lastValue = myValues[i];
+                lastKey = myKeyValues[i<<1];
+                lastValue = myKeyValues[(i<<1)+1];
                 i++;
                 return value();
             }
@@ -506,7 +498,7 @@ public class FastHashMap<K,V>
             Map.Entry<K,V> e = (Map.Entry<K,V>) o;
             int i = positionOf(e.getKey());
             if (i < 0) return false;
-            Object v1 = myValues[i];
+            Object v1 = myKeyValues[(i<<1)+1];
             Object v2 = e.getValue();
             return v1 == v2 || v1 != null && v1.equals(v2);
         }
