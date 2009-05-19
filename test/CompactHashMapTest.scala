@@ -52,15 +52,15 @@ class CompactHashMapTest {
     assertEquals (0, map.size)
 
     assertEquals ("else", map.getOrElse(true, "else"))
-    map update (true, "true")
+    map(true) = "true"
     assertEquals (1, map.size)
     assertEquals ("true", map.getOrElse(true, "else"))
-    map update (true, "1")
+    map(true) = "1"
     assertEquals (1, map.size)
     assertEquals ("1", map.getOrElse(true, "else"))
 
     assertEquals ("else", map.getOrElse(false, "else"))
-    map update (false, "false")
+    map(false) = "false"
     assertEquals (2, map.size)
     assertEquals ("false", map.getOrElse(false, "else"))
   }

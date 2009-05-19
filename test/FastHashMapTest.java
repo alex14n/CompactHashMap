@@ -122,6 +122,22 @@ public class FastHashMapTest {
     assertEquals("3", map.get("c"));
     assertFalse(map.containsKey("d"));
     assertEquals("5", map.get("e"));
+
+    i = map.keySet().iterator();
+    assertTrue(i.hasNext());
+    assertEquals("a",i.next());
+    i.remove();
+    assertTrue(i.hasNext());
+    assertEquals("c",i.next());
+    assertTrue(i.hasNext());
+    assertEquals("e",i.next());
+    i.remove();
+    assertFalse(i.hasNext());
+
+    i = map.keySet().iterator();
+    assertTrue(i.hasNext());
+    assertEquals("c",i.next());
+    assertFalse(i.hasNext());
   }
 
   @Test public void testValues () {

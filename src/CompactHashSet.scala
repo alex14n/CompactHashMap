@@ -336,6 +336,7 @@ private abstract class FixedHashSet[T] (
   /** Make complete copy of this set.
    */
   override final def clone = {
+    // ToDo: -> arraycopy
     val c = FixedHashSet (bits, elemClass)
     c.copyFrom (this, null)
     c

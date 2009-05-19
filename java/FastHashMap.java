@@ -224,10 +224,10 @@ public class FastHashMap<K,V>
      */
     public V remove(Object key) {
       V result = removeKey(key);
-      return result == NotFound ? null : result;
+      return result == NOT_FOUND ? null : result;
     }
 
-    private static Object NotFound = new Object();
+    private static Object NOT_FOUND = new Object();
 
     final private V removeKey(Object key) {
         int hc = hash(key);
@@ -264,7 +264,7 @@ public class FastHashMap<K,V>
             }
             prev = i & (hashLen - 1);
         }
-        return (V)NotFound;
+        return (V)NOT_FOUND;
     }
 
     /**
@@ -414,8 +414,8 @@ public class FastHashMap<K,V>
 
     private abstract class HashIterator<E> implements Iterator<E> {
         protected int i = 0;
-        protected Object lastKey = NotFound;
-        protected Object lastValue = NotFound;
+        protected Object lastKey = NOT_FOUND;
+        protected Object lastValue = NOT_FOUND;
         public final boolean hasNext() {
             while (i < firstEmptyIndex && isEmpty(i)) i++;
             return i < firstEmptyIndex;
@@ -431,12 +431,12 @@ public class FastHashMap<K,V>
             else throw new NoSuchElementException();
         }
         public final void remove() {
-            if (lastKey == NotFound)
+            if (lastKey == NOT_FOUND)
                 throw new IllegalStateException();
             else {
                 removeKey(lastKey);
-                lastKey = NotFound;
-                lastValue = NotFound;
+                lastKey = NOT_FOUND;
+                lastValue = NOT_FOUND;
             }
         }
         protected abstract E value();
@@ -462,7 +462,7 @@ public class FastHashMap<K,V>
             return containsKey(o);
         }
         public boolean remove(Object o) {
-            return FastHashMap.this.removeKey(o) != NotFound;
+            return FastHashMap.this.removeKey(o) != NOT_FOUND;
         }
         public void clear() {
           FastHashMap.this.clear();
