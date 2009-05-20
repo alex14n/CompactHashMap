@@ -841,7 +841,7 @@ private final object FixedHashSet {
                 next2 = ~(arrayIndex | (j & mask) | (if (next2 < 0) 0 else INT_NEXT_IS_EOL))
               }
               // if (null ne callback) callback(arrayIndex, arrayIndex)
-              j = ~index2(size2 + arrayIndex)
+              j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~index2(size2 + arrayIndex)
             }
             if (next1 < 0) indexTable (i) = next1
             if (next2 < 0) indexTable (i + size2) = next2
@@ -974,7 +974,7 @@ private final object FixedHashSet {
                 next2 = ~(arrayIndex | (j & mask) | (if (next2 < 0) 0 else INT_NEXT_IS_EOL))
               }
               // if (null ne callback) callback(arrayIndex, arrayIndex)
-              j = ~index2(size2 + arrayIndex)
+              j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~index2(size2 + arrayIndex)
             }
             if (next1 < 0) indexTable (i) = next1
             if (next2 < 0) indexTable (i + size2) = next2

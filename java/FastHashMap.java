@@ -119,6 +119,7 @@ public class FastHashMap<K,V>
                     if (next2 < 0) newIndices[newHashLen + arrayIndex] = next2;
                     next2 = ~(arrayIndex | (j & newMask) | (next2 < 0 ? 0 : NEXT_IS_EOL));
                 }
+                if ((j & NEXT_IS_EOL) != 0) break;
             }
             if (next1 < 0) newIndices[i] = next1;
             if (next2 < 0) newIndices[i + hashLen] = next2;
