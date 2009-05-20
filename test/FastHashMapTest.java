@@ -90,6 +90,11 @@ public class FastHashMapTest {
     assertEquals(null, map.remove("test"));
     assertEquals(null, map.remove(""));
     assertEquals(50,map.size());
+
+    for (int i = 20; i < 50; i++)
+      assertEquals("("+i+")", map.get("d"+i));
+    for (int i = 0; i < 20; i++)
+      assertEquals(i+"z", map.get("c"+i));
   }
 
   @Test public void testKeySet () {

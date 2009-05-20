@@ -134,19 +134,19 @@ public class FastHashMap<K,V>
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         int prev = -1;
-        for (int i = ~myIndices[hc & (hashLen-1)];
-             i >= 0;
-             i = ~myIndices[hashLen + prev])
-        {
-            prev = i & (hashLen-1);
+        int curr = hc & (hashLen-1);
+        for (int i = ~myIndices[curr]; i >= 0; i = ~myIndices[curr]) {
+            prev = curr;
+            curr = i & (hashLen-1);
             if (hcBits == (i & mask)) {
-                Object x = myKeyValues[prev<<1];
+                Object x = myKeyValues[curr<<1];
                 if (x == elem || x != null && x.equals(elem))
-                    return prev;
+                    return curr;
             }
             if ((i & NEXT_IS_EOL) != 0) return -1;
+            curr += hashLen;
         }
-        if (prev >= 0) myIndices[hashLen + prev] ^= NEXT_IS_EOL;
+        if (prev >= 0) myIndices[prev] ^= NEXT_IS_EOL;
         return -1;
     }
 

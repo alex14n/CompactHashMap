@@ -795,18 +795,21 @@ private final object FixedHashSet {
       val mask = INT_AVAILABLE_BITS ^ (len-1)
       val hcBits = hc & mask
       var prev = -1
-      var i = ~indexTable(hc & (len-1))
+      var curr = hc & (len-1)
+      var i = ~indexTable(curr)
       while (i >= 0) {
-        prev = i & (len-1)
+        prev = curr
+        curr = i & (len-1)
         if (hcBits == (i & mask)) {
-          val x = localArray(prev)
+          val x = localArray(curr)
           if ((x.asInstanceOf[Object] eq elem.asInstanceOf[Object]) || x == elem)
-            return prev;
+            return curr;
         }
         if ((i & INT_NEXT_IS_EOL) != 0) return -1
-        i = ~indexTable(len + prev)
+        curr += len
+        i = ~indexTable(curr)
       }
-      if (prev >= 0) indexTable(len + prev) ^= INT_NEXT_IS_EOL;
+      if (prev >= 0) indexTable(prev) ^= INT_NEXT_IS_EOL;
       -1
     }
     final def isEmpty (i: Int) = {
@@ -925,18 +928,21 @@ private final object FixedHashSet {
       val mask = INT_AVAILABLE_BITS ^ (len-1)
       val hcBits = hc & mask
       var prev = -1
-      var i = ~indexTable(hc & (len-1))
+      var curr = hc & (len-1)
+      var i = ~indexTable(curr)
       while (i >= 0) {
-        prev = i & (len-1)
+        prev = curr
+        curr = i & (len-1)
         if (hcBits == (i & mask)) {
-          val x = localArray(prev)
+          val x = localArray(curr)
           if ((x eq elem.asInstanceOf[Object]) || (x ne null) && (x equals elem))
-            return prev;
+            return curr;
         }
         if ((i & INT_NEXT_IS_EOL) != 0) return -1
-        i = ~indexTable(len + prev)
+        curr += len
+        i = ~indexTable(curr)
       }
-      if (prev >= 0) indexTable(len + prev) ^= INT_NEXT_IS_EOL;
+      if (prev >= 0) indexTable(prev) ^= INT_NEXT_IS_EOL;
       -1
     }
     final def isEmpty (i: Int) = {
