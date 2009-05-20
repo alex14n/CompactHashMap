@@ -136,17 +136,17 @@ public class FastHashMap<K,V>
         int prev = -1;
         for (int i = ~myIndices[hc & (hashLen-1)];
              i >= 0;
-             i = ~myIndices[prev])
+             i = ~myIndices[hashLen + prev])
         {
+            prev = i & (hashLen-1);
             if (hcBits == (i & mask)) {
-                Object x = myKeyValues[(i & (hashLen-1))<<1];
+                Object x = myKeyValues[prev<<1];
                 if (x == elem || x != null && x.equals(elem))
-                    return i & (hashLen-1);
+                    return prev;
             }
             if ((i & NEXT_IS_EOL) != 0) return -1;
-            prev = hashLen + (i & (hashLen-1));
         }
-        if (prev >= 0) myIndices[prev] ^= NEXT_IS_EOL;
+        if (prev >= 0) myIndices[hashLen + prev] ^= NEXT_IS_EOL;
         return -1;
     }
 

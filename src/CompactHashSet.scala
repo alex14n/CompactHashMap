@@ -478,6 +478,11 @@ private final object FixedHashSet {
 
   final val initialBits = 2 // 4 elements
 
+  final val INT_NEXT_IS_EOL = 0x40000000;
+  final val INT_AVAILABLE_BITS = 0x3FFFFFFF;
+  final val SHORT_AVAILABLE_BITS = 0x7FFF;
+  final val BYTE_AVAILABLE_BITS = 0x7F;
+
   /** Create new array to hold set or map elements.
    */
   final def newArray[V] (valueClass: Class[V], size: Int): Array[V] = (
@@ -527,7 +532,7 @@ private final object FixedHashSet {
       super.clear
       fill(indexTable, 0.asInstanceOf[Byte])
     }
-    final def hcBitmask = 0x7F ^ (len-1)
+    final def hcBitmask = BYTE_AVAILABLE_BITS ^ (len-1)
 
     // 'inline' some methods for better performance
 
@@ -538,7 +543,7 @@ private final object FixedHashSet {
     final override def positionOf[B >: T] (elem: B) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
-      val mask = 0x7F ^ (len-1)
+      val mask = BYTE_AVAILABLE_BITS ^ (len-1)
       val hcBits = hc & mask
       var i = ~indexTable(hc & (len-1))
       while (i >= 0 && ((hcBits != (i & mask)) || {
@@ -552,13 +557,14 @@ private final object FixedHashSet {
       val next = indexTable(len+i)
       next == 0 || next > 1
     }
+    // ToDo: Check if System.arraycopy() is slow on small arrays
     final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit) {
       val array2 = that.getArray
       val size2 = if (array2 eq null) 0 else array2.length
       var i = 0
       if (size2 == that.size) {
         fill (indexTable, len, len+size2, 1.asInstanceOf[Byte])
-        val mask = 0x7F ^ (len-1)
+        val mask = BYTE_AVAILABLE_BITS ^ (len-1)
         val mask2 = that.hcBitmask
         if ((mask2 & mask) == mask) {
           val index2 = that.getIndexArray.asInstanceOf[Array[Byte]]
@@ -615,9 +621,9 @@ private final object FixedHashSet {
       val i = hc & (len - 1)
       val next = indexTable (i)
       // Check if elem already present
-      var j = ~next
-      val mask = 0x7F ^ (len-1)
+      val mask = BYTE_AVAILABLE_BITS ^ (len-1)
       val hcBits = hc & mask
+      var j = ~next
       while (j >= 0) {
         val k = j & (len - 1)
         if (hcBits == (j & mask)) {
@@ -654,7 +660,7 @@ private final object FixedHashSet {
       super.clear
       fill(indexTable, 0.asInstanceOf[Short])
     }
-    final def hcBitmask = 0x7FFF ^ (len-1)
+    final def hcBitmask = SHORT_AVAILABLE_BITS ^ (len-1)
 
     // 'inline' some methods for better performance
 
@@ -663,7 +669,7 @@ private final object FixedHashSet {
     final override def positionOf[B >: T] (elem: B) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
-      val mask = 0x7FFF ^ (len-1)
+      val mask = SHORT_AVAILABLE_BITS ^ (len-1)
       val hcBits = hc & mask
       var i = ~indexTable(hc & (len-1))
       while (i >= 0 && ((hcBits != (i & mask)) || {
@@ -683,7 +689,7 @@ private final object FixedHashSet {
       var i = 0
       if (size2 == that.size) {
         fill (indexTable, len, len+size2, 1.asInstanceOf[Short])
-        val mask = 0x7FFF ^ (len-1)
+        val mask = SHORT_AVAILABLE_BITS ^ (len-1)
         val mask2 = that.hcBitmask
         if ((mask2 & mask) == mask) {
           val index2 = that.getIndexArray.asInstanceOf[Array[Short]]
@@ -740,9 +746,9 @@ private final object FixedHashSet {
       val i = hc & (len - 1)
       val next = indexTable (i)
       // Check if elem already present
-      var j = ~next
-      val mask = 0x7FFF ^ (len-1)
+      val mask = SHORT_AVAILABLE_BITS ^ (len-1)
       val hcBits = hc & mask
+      var j = ~next
       while (j >= 0) {
         val k = j & (len - 1)
         if (hcBits == (j & mask)) {
@@ -777,24 +783,31 @@ private final object FixedHashSet {
       super.clear
       fill(indexTable, 0)
     }
-    final def hcBitmask = 0x7FFFFFFF ^ (len-1)
+    final def hcBitmask = INT_AVAILABLE_BITS ^ (len-1)
 
     // 'inline' some methods for better performance
 
     final private[this] val len = 1 << bits
     final private[this] val localArray = a
-    final override def positionOf[B >: T] (elem: B) = {
+    final override def positionOf[B >: T] (elem: B): Int = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
-      val mask = 0x7FFFFFFF ^ (len-1)
+      val mask = INT_AVAILABLE_BITS ^ (len-1)
       val hcBits = hc & mask
+      var prev = -1
       var i = ~indexTable(hc & (len-1))
-      while (i >= 0 && ((hcBits != (i & mask)) || {
-        val x = localArray(i & (len-1))
-        (x.asInstanceOf[Object] ne elem.asInstanceOf[Object]) && x != elem
-      }))
-        i = ~indexTable(len + (i & (len-1)))
-      if (i >= 0) i & (len-1) else -1
+      while (i >= 0) {
+        prev = i & (len-1)
+        if (hcBits == (i & mask)) {
+          val x = localArray(prev)
+          if ((x.asInstanceOf[Object] eq elem.asInstanceOf[Object]) || x == elem)
+            return prev;
+        }
+        if ((i & INT_NEXT_IS_EOL) != 0) return -1
+        i = ~indexTable(len + prev)
+      }
+      if (prev >= 0) indexTable(len + prev) ^= INT_NEXT_IS_EOL;
+      -1
     }
     final def isEmpty (i: Int) = {
       val next = indexTable(len+i)
@@ -806,7 +819,7 @@ private final object FixedHashSet {
       var i = 0
       if (size2 == that.size) {
         fill (indexTable, len, len+size2, 1)
-        val mask = 0x7FFFFFFF ^ (len-1)
+        val mask = INT_AVAILABLE_BITS ^ (len-1)
         val mask2 = that.hcBitmask
         if ((mask2 & mask) == mask) {
           val index2 = that.getIndexArray.asInstanceOf[Array[Int]]
@@ -819,10 +832,10 @@ private final object FixedHashSet {
               val hashIndex = i | (j & (mask ^ mask2))
               if (hashIndex == i) {
                 if (next1 < 0) indexTable (len + arrayIndex) = next1
-                next1 = ~(arrayIndex | (j & mask))
+                next1 = ~(arrayIndex | (j & mask) | (if (next1 < 0) 0 else INT_NEXT_IS_EOL))
               } else {
                 if (next2 < 0) indexTable (len + arrayIndex) = next2
-                next2 = ~(arrayIndex | (j & mask))
+                next2 = ~(arrayIndex | (j & mask) | (if (next2 < 0) 0 else INT_NEXT_IS_EOL))
               }
               // if (null ne callback) callback(arrayIndex, arrayIndex)
               j = ~index2(size2 + arrayIndex)
@@ -863,9 +876,9 @@ private final object FixedHashSet {
       val i = hc & (len - 1)
       val next = indexTable (i)
       // Check if elem already present
-      var j = ~next
-      val mask = 0x7FFFFFFF ^ (len-1)
+      val mask = INT_AVAILABLE_BITS ^ (len-1)
       val hcBits = hc & mask
+      var j = ~next
       while (j >= 0) {
         val k = j & (len - 1)
         if (hcBits == (j & mask)) {
@@ -873,10 +886,10 @@ private final object FixedHashSet {
           if ((o.asInstanceOf[Object] eq elem.asInstanceOf[Object]) || o == elem)
             return k
         }
-        j = ~indexTable (len+k)
+        j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~indexTable (len+k)
       }
       val newIndex = findEmptySpot
-      indexTable (i) = ~(newIndex | hcBits)
+      indexTable (i) = ~(newIndex | hcBits | (if (next < 0) 0 else INT_NEXT_IS_EOL))
       indexTable (len + newIndex) = if (next < 0) next else 1
       localArray (newIndex) = elem
       newIndex
@@ -900,24 +913,31 @@ private final object FixedHashSet {
       super.clear
       fill(indexTable, 0)
     }
-    final def hcBitmask = 0x7FFFFFFF ^ (len-1)
+    final def hcBitmask = INT_AVAILABLE_BITS ^ (len-1)
 
     // 'inline' some methods for better performance
 
     final private[this] val len = 1 << bits
     final private[this] val localArray: Array[Object] = a.asInstanceOf[BoxedObjectArray].value
-    final override def positionOf[B >: T] (elem: B) = {
+    final override def positionOf[B >: T] (elem: B): Int = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
-      val mask = 0x7FFFFFFF ^ (len-1)
+      val mask = INT_AVAILABLE_BITS ^ (len-1)
       val hcBits = hc & mask
+      var prev = -1
       var i = ~indexTable(hc & (len-1))
-      while (i >= 0 && ((hcBits != (i & mask)) || {
-        val x = localArray(i & (len-1))
-        (x ne elem.asInstanceOf[Object]) && !((x ne null) && (x equals elem))
-      }))
-        i = ~indexTable(len + (i & (len-1)))
-      if (i >= 0) i & (len-1) else -1
+      while (i >= 0) {
+        prev = i & (len-1)
+        if (hcBits == (i & mask)) {
+          val x = localArray(prev)
+          if ((x eq elem.asInstanceOf[Object]) || (x ne null) && (x equals elem))
+            return prev;
+        }
+        if ((i & INT_NEXT_IS_EOL) != 0) return -1
+        i = ~indexTable(len + prev)
+      }
+      if (prev >= 0) indexTable(len + prev) ^= INT_NEXT_IS_EOL;
+      -1
     }
     final def isEmpty (i: Int) = {
       val next = indexTable(len+i)
@@ -929,7 +949,7 @@ private final object FixedHashSet {
       var i = 0
       if (size2 == that.size) {
         fill (indexTable, len, len+size2, 1)
-        val mask = 0x7FFFFFFF ^ (len-1)
+        val mask = INT_AVAILABLE_BITS ^ (len-1)
         val mask2 = that.hcBitmask
         if ((mask2 & mask) == mask) {
           val index2 = that.getIndexArray.asInstanceOf[Array[Int]]
@@ -942,10 +962,10 @@ private final object FixedHashSet {
               val hashIndex = i | (j & (mask ^ mask2))
               if (hashIndex == i) {
                 if (next1 < 0) indexTable (len + arrayIndex) = next1
-                next1 = ~(arrayIndex | (j & mask))
+                next1 = ~(arrayIndex | (j & mask) | (if (next1 < 0) 0 else INT_NEXT_IS_EOL))
               } else {
                 if (next2 < 0) indexTable (len + arrayIndex) = next2
-                next2 = ~(arrayIndex | (j & mask))
+                next2 = ~(arrayIndex | (j & mask) | (if (next2 < 0) 0 else INT_NEXT_IS_EOL))
               }
               // if (null ne callback) callback(arrayIndex, arrayIndex)
               j = ~index2(size2 + arrayIndex)
@@ -1001,9 +1021,9 @@ private final object FixedHashSet {
       val i = hc & (len - 1)
       val next = indexTable (i)
       // Check if elem already present
-      var j = ~next
-      val mask = 0x7FFFFFFF ^ (len-1)
+      val mask = INT_AVAILABLE_BITS ^ (len-1)
       val hcBits = hc & mask
+      var j = ~next
       while (j >= 0) {
         val k = j & (len - 1)
         if (hcBits == (j & mask)) {
@@ -1011,10 +1031,10 @@ private final object FixedHashSet {
           if ((o eq elem.asInstanceOf[Object]) || ((o ne null) && (o equals elem)))
             return k
         }
-        j = ~indexTable (len+k)
+        j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~indexTable (len+k)
       }
       val newIndex = findEmptySpot
-      indexTable (i) = ~(newIndex | hcBits)
+      indexTable (i) = ~(newIndex | hcBits | (if (next < 0) 0 else INT_NEXT_IS_EOL))
       indexTable (len + newIndex) = if (next < 0) next else 1
       localArray (newIndex) = elem.asInstanceOf[Object]
       newIndex
