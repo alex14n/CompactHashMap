@@ -176,6 +176,10 @@ private abstract class FixedHashSet[T] (
    */
   def positionOf[B >: T] (elem: B): Int
 
+  /** Return index of integer elem in array or -1 if it does not exists.
+   */
+  def positionOfInt (elem: Int) = positionOf (elem)
+
   /** Array with this set elements.
    */
   final private[this] val array = a
@@ -248,6 +252,13 @@ private abstract class FixedHashSet[T] (
    * @return  index of inserted element in array
    */
   def add (elem: T): Int
+
+  /** Adds integer element to set.
+   *  Throws ResizeNeeded if set is full.
+   *
+   * @return  index of inserted element in array
+   */
+   def addInt (elem: Int): Int = add (elem.asInstanceOf[T])
 
   /** Adds element to set that does not already exist in this set.
    *  Throws ResizeNeeded if set is full.
@@ -812,6 +823,32 @@ private final object FixedHashSet {
       if (prev >= 0) indexTable(prev) ^= INT_NEXT_IS_EOL;
       -1
     }
+    final override def positionOfInt (elem: Int): Int = {
+      localArray.asInstanceOf[Object] match {
+        case bia: BoxedIntArray =>
+          val unboxedArray = bia.value
+          val hc = (elem >>> 20) ^ (elem >>> 12) ^ (elem >>> 7) ^ (elem >>> 4) ^ elem
+          val mask = INT_AVAILABLE_BITS ^ (len-1)
+          val hcBits = hc & mask
+          var prev = -1
+          var curr = hc & (len-1)
+          var i = ~indexTable(curr)
+          while (i >= 0) {
+            prev = curr
+            curr = i & (len-1)
+            if (hcBits == (i & mask)) {
+              val x = unboxedArray(curr)
+              if (x == elem) return curr;
+            }
+            if ((i & INT_NEXT_IS_EOL) != 0) return -1
+            curr += len
+            i = ~indexTable(curr)
+          }
+          if (prev >= 0) indexTable(prev) ^= INT_NEXT_IS_EOL;
+          -1
+        case _ => positionOf (elem)
+      }
+    }
     final def isEmpty (i: Int) = {
       val next = indexTable(len+i)
       next == 0 || next > 1
@@ -896,6 +933,34 @@ private final object FixedHashSet {
       indexTable (len + newIndex) = if (next < 0) next else 1
       localArray (newIndex) = elem
       newIndex
+    }
+    final override def addInt (elem: Int): Int = {
+      localArray.asInstanceOf[Object] match {
+        case bia: BoxedIntArray =>
+          val unboxedArray = bia.value
+          // (inline hashCode) position in firstIndex table
+          val hc = (elem >>> 20) ^ (elem >>> 12) ^ (elem >>> 7) ^ (elem >>> 4) ^ elem
+          val i = hc & (len - 1)
+          val next = indexTable (i)
+          // Check if elem already present
+          val mask = INT_AVAILABLE_BITS ^ (len-1)
+          val hcBits = hc & mask
+          var j = ~next
+          while (j >= 0) {
+            val k = j & (len - 1)
+            if (hcBits == (j & mask)) {
+              val o = unboxedArray (k)
+              if (o == elem) return k
+            }
+            j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~indexTable (len+k)
+          }
+          val newIndex = findEmptySpot
+          indexTable (i) = ~(newIndex | hcBits | (if (next < 0) 0 else INT_NEXT_IS_EOL))
+          indexTable (len + newIndex) = if (next < 0) next else 1
+          unboxedArray (newIndex) = elem
+          newIndex
+        case _ => add (elem.asInstanceOf[T])
+      }
     }
   }
 

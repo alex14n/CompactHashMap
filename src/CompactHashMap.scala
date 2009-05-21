@@ -87,6 +87,13 @@ class CompactHashMap[K,V] (
    */
   override def contains (key: K) = myKeys.positionOf(key) >= 0
 
+  /** Is the given integer key mapped to a value by this map?
+   *
+   *  @param   key  the key
+   *  @return  <code>true</code> if there is a mapping for key in this map
+   */
+  def containsInt (key: Int) = myKeys.positionOfInt(key) >= 0
+
   /** Check if this map maps <code>key</code> to a value and return the
    *  value if it exists.
    *
@@ -108,6 +115,33 @@ class CompactHashMap[K,V] (
   override def apply (key: K): V = {
     val i = myKeys.positionOf(key)
     if (i >= 0) myValues(i) else default(key)
+  }
+
+  /** Retrieve the value which is associated with the given integer key.
+   *  If there is no mapping from the given key to a value,
+   *  default(key) is returned (currenly throws an exception).
+   *
+   *  @param   key  the key
+   *  @return  the value associated with the given key.
+   */
+  def applyInt (key: Int): V = {
+    val i = myKeys.positionOfInt(key)
+    if (i >= 0) myValues(i) else default(key.asInstanceOf[K])
+  }
+
+  /** Retrieve the integer value which is associated with the given integer key.
+   *  If there is no mapping from the given key to a value,
+   *  default(key) is returned (currenly throws an exception).
+   *
+   *  @param   key  the key
+   *  @return  the value associated with the given key.
+   */
+  def applyIntInt (key: Int): Int = {
+    val i = myKeys.positionOfInt(key)
+    if (i >= 0) myValues.asInstanceOf[Object] match {
+      case bia: scala.runtime.BoxedIntArray => bia.value(i)
+      case _ => myValues(i).asInstanceOf[Int]
+    } else default(key.asInstanceOf[K]).asInstanceOf[Int]
   }
 
   /** Check if this map maps <code>key</code> to a value.
@@ -194,6 +228,51 @@ class CompactHashMap[K,V] (
         resize (key, value, myKeys.bits + 1)
         val i2 = myKeys.addNew (key)
         myValues(i2) = value
+    }
+
+  /** This method allows one to add a new mapping from integer <code>key</code>
+   *  to <code>value</code> to the map. If the map already contains a
+   *  mapping for <code>key</code>, it will be overridden by this
+   *  function.
+   *
+   * @param  key    The key to update
+   * @param  value  The new value
+   */
+  def updateInt (key: Int, value: V) =
+    try {
+      val i = myKeys.addInt (key)
+      myValues(i) = value
+    } catch {
+      case e: ResizeNeeded =>
+        val boxedKey = key.asInstanceOf[K]
+        resize (boxedKey, value, myKeys.bits + 1)
+        val i2 = myKeys.addNew (boxedKey)
+        myValues(i2) = value
+    }
+
+  /** This method allows one to add a new mapping from integer <code>key</code>
+   *  to integer <code>value</code> to the map. If the map already contains a
+   *  mapping for <code>key</code>, it will be overridden by this
+   *  function.
+   *
+   * @param  key    The key to update
+   * @param  value  The new value
+   */
+  def updateIntInt (key: Int, value: Int) =
+    myValues.asInstanceOf[Object] match {
+      case bia: scala.runtime.BoxedIntArray => 
+        try {
+          val i = myKeys.addInt (key)
+          bia.value(i) = value
+        } catch {
+          case e: ResizeNeeded =>
+            val boxedKey = key.asInstanceOf[K]
+            val boxedValue = value.asInstanceOf[V]
+            resize (boxedKey, boxedValue, myKeys.bits + 1)
+            val i2 = myKeys.addNew (boxedKey)
+            myValues(i2) = boxedValue
+        }
+      case _ => updateInt (key, value.asInstanceOf[V])
     }
 
   /** Insert new key-value mapping or update existing with given function.
