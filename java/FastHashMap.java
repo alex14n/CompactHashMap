@@ -98,17 +98,13 @@ public class FastHashMap<K,V>
         int newValueLen = (int)(newHashLen * loadFactor);
         Object[] newKeyValues = Arrays.copyOf(myKeyValues,newValueLen<<1);
         int[] newIndices = new int[newHashLen+newValueLen];
-        Arrays.fill(newIndices, newHashLen, newHashLen+counter, 1);
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int newMask = AVAILABLE_BITS ^ (newHashLen-1);
         for (int i = 0; i < hashLen; i++) {
             int next1 = 0;
             int next2 = 0;
             int arrayIndex;
-            for (int j = ~myIndices[i];
-                j >= 0;
-                j = ~myIndices[hashLen + arrayIndex])
-            {
+            for (int j = ~myIndices[i]; j >= 0; j = ~myIndices[hashLen + arrayIndex]) {
                 arrayIndex = j & (hashLen-1);
                 int hashIndex = i | (j & (newMask ^ mask));
                 if (hashIndex == i) {
@@ -146,13 +142,11 @@ public class FastHashMap<K,V>
             if ((i & NEXT_IS_EOL) != 0) return -1;
             curr += hashLen;
         }
-        if (prev >= 0) myIndices[prev] ^= NEXT_IS_EOL;
         return -1;
     }
 
     final private boolean isEmpty(int i) {
-        int next = myIndices[hashLen+i];
-        return next == 0 || next >= 2;
+        return i >= firstEmptyIndex || myIndices[hashLen+i] > 0;
     }
 
     /**
@@ -199,11 +193,12 @@ public class FastHashMap<K,V>
         int newIndex;
         if (firstDeletedIndex >= 0) {
             newIndex = firstDeletedIndex;
-            firstDeletedIndex = myIndices[hashLen+firstDeletedIndex];
-            if (firstDeletedIndex >= 2)
-                firstDeletedIndex -= 2;
-            else
+            int di = myIndices[hashLen+firstDeletedIndex];
+            if (di == NEXT_IS_EOL)
                 firstDeletedIndex = -1;
+            else
+                firstDeletedIndex = di-1;
+            if (next >= 0) myIndices[hashLen+newIndex] = 0;
         } else {
             newIndex = firstEmptyIndex;
             firstEmptyIndex++;
@@ -211,7 +206,7 @@ public class FastHashMap<K,V>
         // Insert it
         myKeyValues[newIndex<<1] = key;
         myKeyValues[(newIndex<<1)+1] = value;
-        myIndices[hashLen + newIndex] = next < 0 ? next : 1;
+        if (next < 0) myIndices[hashLen + newIndex] = next;
         myIndices[i] = ~(newIndex | hcBits | (next < 0 ? 0 : NEXT_IS_EOL));
         counter++;
         return null;
@@ -236,38 +231,40 @@ public class FastHashMap<K,V>
     final private V removeKey(Object key) {
         int hc = hash(key);
         int h = hc & (hashLen-1);
-        int i0 = ~myIndices[h];
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         int prev = -1;
-        for (int i = i0; i >= 0; i = ~myIndices[hashLen+prev]) {
+        int curr = hc & (hashLen-1);
+        for (int i = ~myIndices[curr]; i >= 0; i = ~myIndices[curr]) {
+            int j = i & (hashLen-1);
+            int k = hashLen + j;
             if (hcBits == (i & mask)) {
-                Object o = myKeyValues[(i & (hashLen-1))<<1];
+                Object o = myKeyValues[j<<1];
                 if (o == key || o != null && o.equals(key)) {
-                    i &= hashLen - 1;
                     counter--;
-                    if (prev >= 0)
-                        myIndices[hashLen+prev] = myIndices[hashLen+i];
-                    else
-                        myIndices[h] = myIndices[hashLen+i];
-                    if (i == firstEmptyIndex-1) {
-                        firstEmptyIndex = i;
-                        myIndices[hashLen+i] = 0;
-                    } else if (firstDeletedIndex == hashLen-2) {
-                        myIndices[hashLen+i] = myIndices[hashLen+firstDeletedIndex];
-                        myIndices[hashLen+firstDeletedIndex] = i+2;
+                    if((i & NEXT_IS_EOL) != 0) {
+                        if (prev >= 0)
+                            myIndices[prev] ^= NEXT_IS_EOL;
+                        else
+                            myIndices[curr] = 0;
                     } else {
-                        myIndices[hashLen+i] = firstDeletedIndex < 0 ? 0 : firstDeletedIndex+2;
-                        firstDeletedIndex = i;
+                        myIndices[curr] = myIndices[k];
                     }
-                    Object oldValue = myKeyValues[(i<<1)+1];
-                    myKeyValues[i<<1] = null;
-                    myKeyValues[(i<<1)+1] = null;
+                    if (j == firstEmptyIndex-1) {
+                        firstEmptyIndex = j;
+                    } else {
+                        myIndices[k] = firstDeletedIndex < 0 ? NEXT_IS_EOL : firstDeletedIndex+1;
+                        firstDeletedIndex = j;
+                    }
+                    Object oldValue = myKeyValues[(j<<1)+1];
+                    myKeyValues[j<<1] = null;
+                    myKeyValues[(j<<1)+1] = null;
                     return (V)oldValue;
                 }
             }
             if ((i & NEXT_IS_EOL) != 0) break;
-            prev = i & (hashLen - 1);
+            prev = curr;
+            curr = k;
         }
         return (V)NOT_FOUND;
     }
@@ -339,7 +336,6 @@ public class FastHashMap<K,V>
     public V get(Object key) {
         int i = positionOf(key);
         return i >= 0 ? (V)myKeyValues[(i<<1)+1] : null;
-        // return i >= 0 ? (V)Array.get(myKeyValues,(i<<1)+1) : null;
     }
 
     /**
@@ -377,14 +373,12 @@ public class FastHashMap<K,V>
      *         specified value
      */
     public boolean containsValue(Object value) {
-        for (int i = 0; i < firstEmptyIndex ; i++) {
-            int next = myIndices[hashLen+i];
-            if (next == 1 || next < 0) {
+        for (int i = 0; i < firstEmptyIndex ; i++)
+            if (myIndices[hashLen+i] <= 0) { // Not deleted
                 Object o = myKeyValues[(i<<1)+1];
                 if (o == value || o != null && o.equals(value))
                     return true;
             }
-        }
         return false;
     }
 

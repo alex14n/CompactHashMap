@@ -65,6 +65,10 @@ public class FastHashMapTest {
       assertEquals(i+"z", map.get("c"+i));
     }
 
+    int c = 0;
+    for (String e : map.keySet()) c++;
+    assertEquals (40, c);
+
     for (int i = 0; i < 50; i++)
       map.put("d"+i, "("+i+")");
 
@@ -95,6 +99,10 @@ public class FastHashMapTest {
       assertEquals("("+i+")", map.get("d"+i));
     for (int i = 0; i < 20; i++)
       assertEquals(i+"z", map.get("c"+i));
+
+    c = 0;
+    for (String e : map.keySet()) c++;
+    assertEquals (50, c);
   }
 
   @Test public void testKeySet () {
