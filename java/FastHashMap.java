@@ -146,7 +146,7 @@ public class FastHashMap<K,V>
     }
 
     final private boolean isEmpty(int i) {
-        return i >= firstEmptyIndex || myIndices[hashLen+i] > 0;
+        return /* i >= firstEmptyIndex || */ myIndices[hashLen+i] > 0;
     }
 
     /**
@@ -374,7 +374,7 @@ public class FastHashMap<K,V>
      */
     public boolean containsValue(Object value) {
         for (int i = 0; i < firstEmptyIndex ; i++)
-            if (myIndices[hashLen+i] <= 0) { // Not deleted
+            if (!isEmpty(i)) { // Not deleted
                 Object o = myKeyValues[(i<<1)+1];
                 if (o == value || o != null && o.equals(value))
                     return true;

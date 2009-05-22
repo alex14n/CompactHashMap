@@ -43,6 +43,8 @@ public class FastHashMapTest {
 
   @Test public void testRemove () {
     FastHashMap<String,String> map = new FastHashMap<String,String> ();
+    int c;
+
     assertEquals(null, map.remove(null));
     assertEquals(null, map.remove("test"));
     assertEquals(null, map.remove(""));
@@ -57,17 +59,17 @@ public class FastHashMapTest {
 
     for (int i = 0; i < 20; i++) {
       assertEquals(i+"x", map.remove("a"+i));
+      assertFalse(map.containsValue(i+"x"));
       assertEquals(59-i, map.size());
+      c = 0;
+      for (String e : map.keySet()) c++;
+      assertEquals (59-i, c);
     }
     for (int i = 0; i < 20; i++) {
       assertFalse(map.containsKey("a"+i));
       assertEquals(i+"y", map.get("b"+i));
       assertEquals(i+"z", map.get("c"+i));
     }
-
-    int c = 0;
-    for (String e : map.keySet()) c++;
-    assertEquals (40, c);
 
     for (int i = 0; i < 50; i++)
       map.put("d"+i, "("+i+")");
