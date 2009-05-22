@@ -2,6 +2,9 @@ import java.util.*;
 import java.io.*;
 import java.lang.reflect.Array;
 
+/**
+ * @author  Alex Yakovlev
+ */
 public class FastHashMap<K,V>
     extends AbstractMap<K,V>
     implements Cloneable, Serializable, Map<K,V>
