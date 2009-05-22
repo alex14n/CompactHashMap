@@ -176,4 +176,16 @@ public class FastHashMapTest {
     assertFalse(map.containsKey("d"));
     assertEquals("5", map.get("e"));
   }
+
+  @Test public void testClone () {
+    FastHashMap<String,String> map = new FastHashMap<String,String> ();
+    map.put("a","b");
+    FastHashMap<String,String> clone = map.clone();
+    clone.put("a", "c");
+    map.put("b", "d");
+    assertEquals("b", map.get("a"));
+    assertEquals("c", clone.get("a"));
+    assertEquals("d", map.get("b"));
+    assertFalse(clone.containsKey("b"));
+  }
 }

@@ -96,8 +96,7 @@ public class FastHashMap<K,V>
     final private void resize() {
         int newHashLen = hashLen << 1;
         int newValueLen = (int)(newHashLen * loadFactor);
-        Object[] newKeyValues = new Object[newValueLen<<1];
-        System.arraycopy(myKeyValues, 0, newKeyValues, 0, counter<<1);
+        Object[] newKeyValues = Arrays.copyOf(myKeyValues,newValueLen<<1);
         int[] newIndices = new int[newHashLen+newValueLen];
         Arrays.fill(newIndices, newHashLen, newHashLen+counter, 1);
         int mask = AVAILABLE_BITS ^ (hashLen-1);
@@ -291,13 +290,14 @@ public class FastHashMap<K,V>
      *
      * @return a shallow copy of this map
      */
-    public Object clone() {
-        FastHashMap<K,V> that = new FastHashMap<K,V>(hashLen, loadFactor);
-        that.counter = counter;
-        that.firstEmptyIndex = firstEmptyIndex;
-        that.firstDeletedIndex = firstDeletedIndex;
-        System.arraycopy(myKeyValues, 0, that.myKeyValues, 0, firstEmptyIndex<<1);
-        System.arraycopy(myIndices, 0, that.myIndices, 0, hashLen+firstEmptyIndex);
+    public FastHashMap<K,V> clone() {
+        FastHashMap<K,V> that = null;
+        try {
+            that = (FastHashMap<K,V>)super.clone();
+        } catch (CloneNotSupportedException e) {
+        }
+        that.myKeyValues = myKeyValues.clone();
+        that.myIndices = myIndices.clone();
         return that;
     }
 

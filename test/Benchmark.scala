@@ -9,19 +9,19 @@ final class HashCached (final val i: Int) {
 object Benchmark {
   private[this] val iterations = 0x180000
   final def intKey(i: Int) = i*123
-/*
+
   type T = Object
   private[this] val values = (0 to iterations*2).toList map { x => new Object } toArray
-
+/*
   type T = String
   private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
 
   type T = HashCached
   private[this] val values = (0 to iterations*2).toList map { x => new HashCached(100000+x*123) } toArray
-*/
+
   type T = Int
   final def values(i: Int) = intKey(i)
-
+*/
   private[this] var scalaMap: scala.collection.mutable.Map[T,T] = _
   private[this] var compactMap: CompactHashMap[T,T] = _
   private[this] var javaMap: java.util.Map[T,T] = _
@@ -49,10 +49,10 @@ object Benchmark {
   }
 
   def compactIntWrite () {
-    compactMap = new CompactHashMap (classOf[Int], classOf[Int], iterations)
+    compactMap = new CompactHashMap // (classOf[Int], classOf[Int], iterations)
     var i = 0
     while (i < iterations) {
-      compactMap updateIntInt (values(i), values(2*iterations-i))
+      compactMap updateIntInt (intKey(i), intKey(2*iterations-i))
       i += 1
     }
   }
@@ -67,7 +67,7 @@ object Benchmark {
   }
 
   def troveIntWrite {
-    troveIntMap = new gnu.trove.TIntIntHashMap (16, 0.4f)
+    troveIntMap = new gnu.trove.TIntIntHashMap // (16, 0.4f)
     var i = 0
     while (i < iterations) {
       troveIntMap put (intKey(i), intKey(2*iterations-i))
@@ -76,7 +76,7 @@ object Benchmark {
   }
 
   def fastutilIntWrite {
-    fastutilIntMap = new it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap (iterations, 0.5f)
+    fastutilIntMap = new it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap // (iterations, 0.5f)
     var i = 0
     while (i < iterations) {
       fastutilIntMap put (intKey(i), intKey(2*iterations-i))
@@ -108,7 +108,7 @@ object Benchmark {
     var i = 0
     while (i < iterations) {
       val j = reoder(i)
-      assert (compactMap.applyIntInt(values(j)) == values(2*iterations-j))
+      assert (compactMap.applyIntInt(intKey(j)) == intKey(2*iterations-j))
       i += 1
     }
   }
@@ -116,7 +116,7 @@ object Benchmark {
   def compactIntReadEmpty {
     var i = iterations
     while (i < 2*iterations) {
-      assert (! compactMap.containsInt(values(i)))
+      assert (! compactMap.containsInt(intKey(i)))
       i += 1
     }
     compactMap = null
@@ -177,7 +177,6 @@ object Benchmark {
   }
 
   val tests: List[(String,()=>Unit)] = List(
-/*
     "fastWrite" -> {() => javaWrite(new FastHashMap)},
     "fastReadFull" -> javaReadFull _,
     "fastReadEmpty" -> javaReadEmpty _,
@@ -187,17 +186,16 @@ object Benchmark {
     "compactWrite" -> {() => scalaWrite (new CompactHashMap)},
     "compactReadFull" -> scalaReadFull _,
     "compactReadEmpty" -> scalaReadEmpty _,
+/*
     "fastutilWrite" -> {() => javaWrite(new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap)},
     "fastutilReadFull" -> javaReadFull _,
     "fastutilReadEmpty" -> javaReadEmpty _,
-*/
     "compactIntWrite" -> compactIntWrite _,
     "compactIntReadFull" -> compactIntReadFull _,
     "compactIntReadEmpty" -> compactIntReadEmpty _,
     "fastutilIntWrite" -> fastutilIntWrite _,
     "fastutilIntReadFull" -> fastutilIntReadFull _,
     "fastutilIntReadEmpty" -> fastutilIntReadEmpty _,
-/*
     "troveIntWrite" -> troveIntWrite _,
     "troveIntReadFull" -> troveIntReadFull _,
     "troveIntReadEmpty" -> troveIntReadEmpty _,

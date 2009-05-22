@@ -91,7 +91,7 @@ extends scala.collection.mutable.Set[T] {
               elem.asInstanceOf[Object].getClass
           ).asInstanceOf[Class[T]]
       )
-      newFixedSet.copyFrom (fixedSet, null)
+      newFixedSet.copyFrom (fixedSet, null, true)
       fixedSet = newFixedSet
       fixedSet.add (elem)
   }
@@ -116,7 +116,7 @@ extends scala.collection.mutable.Set[T] {
    *
    *  @return  a set with the same elements.
    */
-  override def clone = new CompactHashSet (fixedSet.clone)
+  override def clone = new CompactHashSet (fixedSet.clone) // ToDo: super.clone
 
   /** Returns a new set containing all elements of this set that
    *  satisfy the predicate <code>p</code>.
@@ -296,7 +296,7 @@ private abstract class FixedHashSet[T] (
    *  @param  callback  function to call for each copied element
    *                    with its new and old indices in set's arrays.
    */
-  def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit)
+  def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit, copyValues: Boolean)
 
   /** Make copy of this set filtered by predicate.
    *
@@ -346,12 +346,7 @@ private abstract class FixedHashSet[T] (
 
   /** Make complete copy of this set.
    */
-  override final def clone = {
-    // ToDo: -> arraycopy
-    val c = FixedHashSet (bits, elemClass)
-    c.copyFrom (this, null)
-    c
-  }
+  override final def clone = FixedHashSet (bits, this) // ToDo: super.clone
 
   /** Removes all elements from the set.
    */
@@ -479,7 +474,7 @@ private abstract class FixedHashSet[T] (
 import scala.runtime._
 import scala.runtime.ScalaRunTime.boxArray
 import scala.compat.Platform.createArray
-import java.util.Arrays.fill
+import java.util.Arrays.{fill, copyOf}
 
 /**
  */
@@ -569,7 +564,7 @@ private final object FixedHashSet {
       next == 0 || next > 1
     }
     // ToDo: Check if System.arraycopy() is slow on small arrays
-    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit) {
+    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit, copyValues: Boolean) {
       val array2 = that.getArray
       val size2 = if (array2 eq null) 0 else array2.length
       var i = 0
@@ -613,7 +608,7 @@ private final object FixedHashSet {
           if (null ne callback) callback(i, i)
           i += 1
         }
-        if (array2 ne null) array2.copyToArray (localArray, 0)
+        if (copyValues && (array2 ne null)) array2.copyToArray (localArray, 0)
         setSize (size2)
       } else {
         while (i < size2) {
@@ -694,7 +689,7 @@ private final object FixedHashSet {
       val next = indexTable(len+i)
       next == 0 || next > 1
     }
-    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit) {
+    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit, copyValues: Boolean) {
       val array2 = that.getArray
       val size2 = if (array2 eq null) 0 else array2.length
       var i = 0
@@ -738,7 +733,7 @@ private final object FixedHashSet {
           if (null ne callback) callback(i, i)
           i += 1
         }
-        if (array2 ne null) array2.copyToArray (localArray, 0)
+        if (copyValues && (array2 ne null)) array2.copyToArray (localArray, 0)
         setSize (size2)
       } else {
         while (i < size2) {
@@ -853,7 +848,7 @@ private final object FixedHashSet {
       val next = indexTable(len+i)
       next == 0 || next > 1
     }
-    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit) {
+    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit, copyValues: Boolean) {
       val array2 = that.getArray
       val size2 = if (array2 eq null) 0 else array2.length
       var i = 0
@@ -897,7 +892,7 @@ private final object FixedHashSet {
           if (null ne callback) callback(i, i)
           i += 1
         }
-        if (array2 ne null) array2.copyToArray (localArray, 0)
+        if (copyValues && (array2 ne null)) array2.copyToArray (localArray, 0)
         setSize (size2)
       } else {
         while (i < size2) {
@@ -1014,7 +1009,7 @@ private final object FixedHashSet {
       val next = indexTable(len+i)
       next == 0 || next > 1
     }
-    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit) {
+    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit, copyValues: Boolean) {
       val array2 = that.getArray
       val size2 = if (array2 eq null) 0 else array2.length
       var i = 0
@@ -1073,7 +1068,7 @@ private final object FixedHashSet {
             i += 1
           }
         }
-        if (array2 ne null) array2.copyToArray (getArray, 0)
+        if (copyValues && (array2 ne null)) array2.copyToArray (getArray, 0)
         setSize (size2)
       } else {
         while (i < size2) {
@@ -1124,13 +1119,13 @@ private final object FixedHashSet {
     protected final def setNextIndex (i: Int, v: Int) { }
     final def hcBitmask = 0
     final def getIndexArray = null
-    final def copyFrom (that: FixedHashSet[Any], callback: (Int,Int) => Unit) { }
+    final def copyFrom (that: FixedHashSet[Any], callback: (Int,Int) => Unit, copyValues: Boolean) { }
     final override def add (elem: Any): Int = { throw new ResizeNeeded }
   }
 
   /** Construct FixedHashSet implementation with given parameters.
    */
-  final def apply[T] (bits: Int, elemClass: Class[T]): FixedHashSet[T] = {
+  final def apply[T] (bits: Int, elemClass: Class[T]): FixedHashSet[T] =
     if (bits <= 0 || (elemClass eq null))
       EmptyHashSet.asInstanceOf[FixedHashSet[T]]
     else {
@@ -1144,5 +1139,49 @@ private final object FixedHashSet {
       else
         new IntHashSet (bits, elemClass, a)
     }
+
+  /** Construct FixedHashSet implementation with given parameters
+   *  and copy values from another set.
+   */
+  final def apply[T] (bits: Int, that: FixedHashSet[T]): FixedHashSet[T] = {
+    val a = resizeArray (that.getArray, 1 << bits)
+    val newSet = if (bits <  8)
+        new ByteHashSet (bits, that.elemClass, a) else
+      if (bits < 16)
+        new ShortHashSet (bits, that.elemClass, a) else
+      if (a.isInstanceOf[BoxedObjectArray])
+        new IntObjectHashSet (bits, that.elemClass, a)
+      else
+        new IntHashSet (bits, that.elemClass, a)
+    newSet.copyFrom (that, null, false)
+    newSet
   }
+
+  /** Create a new boxed array of new size with elements of another array.
+   */
+  final def resizeArray[T] (a: Array[T], newSize: Int): Array[T] = (
+    a.asInstanceOf[Object] match {
+      case ba: BoxedBooleanArray =>
+        new BoxedBooleanArray (copyOf(ba.value, newSize))
+      case ba: BoxedCharArray =>
+        new BoxedCharArray (copyOf(ba.value, newSize))
+      case ba: BoxedByteArray =>
+        new BoxedByteArray (copyOf(ba.value, newSize))
+      case ba: BoxedShortArray =>
+        new BoxedShortArray (copyOf(ba.value, newSize))
+      case ba: BoxedIntArray =>
+        new BoxedIntArray (copyOf(ba.value, newSize))
+      case ba: BoxedLongArray =>
+        new BoxedLongArray (copyOf(ba.value, newSize))
+      case ba: BoxedFloatArray =>
+        new BoxedFloatArray (copyOf(ba.value, newSize))
+      case ba: BoxedDoubleArray =>
+        new BoxedDoubleArray (copyOf(ba.value, newSize))
+      case ba: BoxedObjectArray =>
+        new BoxedObjectArray (copyOf(ba.value, newSize))
+      case _ =>
+        val newArray = new Array[T](newSize)
+        a.copyToArray (newArray, 0)
+        newArray
+    }).asInstanceOf[Array[T]]
 }

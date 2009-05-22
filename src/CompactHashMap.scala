@@ -200,15 +200,16 @@ class CompactHashMap[K,V] (
       else value.asInstanceOf[Object].getClass
     ).asInstanceOf[Class[V]]
     //
-    val newKeys = FixedHashSet (bits, keyClass)
-    val newValues = newArray (valueClass, newKeys.capacity)
     if ((myValues ne null) && (myKeys.size == myValues.length)) {
-      newKeys.copyFrom (myKeys, null)
-      myValues.copyToArray (newValues, 0)
-    } else
-      newKeys.copyFrom (myKeys, (i,j) => newValues(i) = myValues(j))
-    myKeys = newKeys
-    myValues = newValues
+      myKeys = FixedHashSet (bits, myKeys)
+      myValues = resizeArray (myValues, myKeys.capacity)
+    } else {
+      val newKeys = FixedHashSet (bits, keyClass)
+      val newValues = newArray (valueClass, newKeys.capacity)
+      newKeys.copyFrom (myKeys, (i,j) => newValues(i) = myValues(j), true)
+      myKeys = newKeys
+      myValues = newValues
+    }
   }
 
   /** This method allows one to add a new mapping from <code>key</code>
@@ -260,7 +261,7 @@ class CompactHashMap[K,V] (
    */
   def updateIntInt (key: Int, value: Int) =
     myValues.asInstanceOf[Object] match {
-      case bia: scala.runtime.BoxedIntArray => 
+      case bia: scala.runtime.BoxedIntArray =>
         try {
           val i = myKeys.addInt (key)
           bia.value(i) = value
@@ -379,9 +380,10 @@ class CompactHashMap[K,V] (
    *  @return a map with the same elements.
    */
   override def clone = {
+    // ToDo: super.clone
     val newKeys = FixedHashSet (myKeys.bits, keyClass)
     val newValues = newArray (valueClass, newKeys.capacity)
-    newKeys.copyFrom (myKeys, (i,j) => newValues(i) = myValues(j))
+    newKeys.copyFrom (myKeys, (i,j) => newValues(i) = myValues(j), true)
     new CompactHashMap (newKeys, newValues, valueClass)
   }
 
