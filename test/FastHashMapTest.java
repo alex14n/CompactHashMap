@@ -1,4 +1,5 @@
 import java.util.*;
+import java.io.*;
 import org.junit.*;
 import static org.junit.Assert.*;
 
@@ -197,5 +198,43 @@ public class FastHashMapTest {
     assertEquals("c", clone.get("a"));
     assertEquals("d", map.get("b"));
     assertFalse(clone.containsKey("b"));
+  }
+
+
+  @Test public void testReadWrite () throws IOException, ClassNotFoundException {
+    ByteArrayOutputStream bos = new ByteArrayOutputStream();
+    ObjectOutputStream oos = new ObjectOutputStream(bos);
+
+    // Fill the map
+    FastHashMap<String,String> map = new FastHashMap<String,String> ();
+    map.put("a","1");
+    map.put("b","2");
+    map.put("c","3");
+    map.put("d","4");
+    map.remove("a");
+    map.remove("d");
+
+    // Write it
+    oos.writeObject(map);
+    oos.close();
+    bos.close();
+
+    // Read it
+    ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
+    ObjectInputStream ois = new ObjectInputStream(bis);
+    FastHashMap<String,String> read = (FastHashMap<String,String>)ois.readObject();
+    assertEquals(0, ois.available());
+    ois.close();
+    assertEquals(0, bis.available());
+    bis.close();
+
+    // Check it
+    assertFalse(map == read);
+    assertEquals(map.size(), read.size());
+    assertFalse(read.containsKey("a"));
+    assertEquals("2", read.get("b"));
+    assertEquals("3", read.get("c"));
+    assertFalse(read.containsKey("d"));
+    assertEquals(map, read);
   }
 }

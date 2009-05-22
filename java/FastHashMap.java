@@ -1,5 +1,5 @@
 import java.util.*;
-import java.io.Serializable;
+import java.io.*;
 import java.lang.reflect.Array;
 
 public class FastHashMap<K,V>
@@ -17,13 +17,6 @@ public class FastHashMap<K,V>
     static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
     /**
-     * The load factor for the hash table.
-     *
-     * @serial
-     */
-    final float loadFactor;
-
-    /**
      * Applies a supplemental hash function to a given object's hashCode,
      * which defends against poor quality hash functions. This is critical
      * because HashMap uses power-of-two length hash tables, that
@@ -38,14 +31,24 @@ public class FastHashMap<K,V>
         return (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h;
     }
 
-    private int counter = 0;
-    private Object[] myKeyValues;
-    private int[] myIndices;
-    private int firstEmptyIndex = 0;
-    private int firstDeletedIndex = -1;
+    transient private int size = 0;
+    transient private Object[] myKeyValues;
+    transient private int[] myIndices;
+    transient private int firstEmptyIndex = 0;
+    transient private int firstDeletedIndex = -1;
+    transient private int hashLen;
 
-    private int hashLen;
-    private int valueLen;
+    /**
+     * The next size value at which to resize (capacity * load factor).
+     * @serial
+     */
+    private int threshold;
+
+    /**
+     * The load factor for the hash table.
+     * @serial
+     */
+    final float loadFactor;
 
     private final static int AVAILABLE_BITS = 0x3FFFFFFF;
     private final static int NEXT_IS_EOL = 0x40000000;
@@ -57,9 +60,9 @@ public class FastHashMap<K,V>
     public FastHashMap() {
         loadFactor = DEFAULT_LOAD_FACTOR;
         hashLen = DEFAULT_INITIAL_CAPACITY;
-        valueLen = (int)(hashLen * loadFactor);
-        myKeyValues = new Object[valueLen<<1];
-        myIndices = new int[hashLen+valueLen];
+        threshold = (int)(hashLen * loadFactor);
+        myKeyValues = new Object[threshold<<1];
+        myIndices = new int[hashLen+threshold];
     }
 
     /**
@@ -77,9 +80,9 @@ public class FastHashMap<K,V>
         for (hashLen = DEFAULT_INITIAL_CAPACITY;
              hashLen < initialCapacity;
              hashLen <<= 1);
-        valueLen = (int)(hashLen * loadFactor);
-        myKeyValues = new Object[valueLen<<1];
-        myIndices = new int[hashLen+valueLen];
+        threshold = (int)(hashLen * loadFactor);
+        myKeyValues = new Object[threshold<<1];
+        myIndices = new int[hashLen+threshold];
     }
 
     /**
@@ -120,7 +123,7 @@ public class FastHashMap<K,V>
             if (next2 < 0) newIndices[i + hashLen] = next2;
         }
         hashLen = newHashLen;
-        valueLen = newValueLen;
+        threshold = newValueLen;
         myKeyValues = newKeyValues;
         myIndices = newIndices;
     }
@@ -146,7 +149,7 @@ public class FastHashMap<K,V>
     }
 
     final private boolean isEmpty(int i) {
-        return /* i >= firstEmptyIndex || */ myIndices[hashLen+i] > 0;
+        return /* i >= firstEmptyIndex || */ i == firstDeletedIndex || myIndices[hashLen+i] > 0;
     }
 
     /**
@@ -182,7 +185,7 @@ public class FastHashMap<K,V>
             if ((j & NEXT_IS_EOL) != 0) break;
         }
         // Resize if needed
-        if (counter >= valueLen) {
+        if (size >= threshold) {
             resize();
             i = hc & (hashLen - 1);
             next = myIndices[i];
@@ -208,7 +211,7 @@ public class FastHashMap<K,V>
         myKeyValues[(newIndex<<1)+1] = value;
         if (next < 0) myIndices[hashLen + newIndex] = next;
         myIndices[i] = ~(newIndex | hcBits | (next < 0 ? 0 : NEXT_IS_EOL));
-        counter++;
+        size++;
         return null;
     }
 
@@ -241,7 +244,7 @@ public class FastHashMap<K,V>
             if (hcBits == (i & mask)) {
                 Object o = myKeyValues[j<<1];
                 if (o == key || o != null && o.equals(key)) {
-                    counter--;
+                    size--;
                     if((i & NEXT_IS_EOL) != 0) {
                         if (prev >= 0)
                             myIndices[prev] ^= NEXT_IS_EOL;
@@ -276,7 +279,7 @@ public class FastHashMap<K,V>
     public void clear() {
         Arrays.fill(myKeyValues, 0, firstEmptyIndex<<1, null);
         Arrays.fill(myIndices, 0, hashLen + firstEmptyIndex, 0);
-        counter = 0;
+        size = 0;
         firstEmptyIndex = 0;
         firstDeletedIndex = -1;
     }
@@ -304,7 +307,7 @@ public class FastHashMap<K,V>
      * @return the number of key-value mappings in this map
      */
     public int size() {
-        return counter;
+        return size;
     }
 
     /**
@@ -313,7 +316,7 @@ public class FastHashMap<K,V>
      * @return <tt>true</tt> if this map contains no key-value mappings
      */
     public boolean isEmpty() {
-        return counter == 0;
+        return size == 0;
     }
 
     /**
@@ -381,8 +384,6 @@ public class FastHashMap<K,V>
             }
         return false;
     }
-
-    private static final long serialVersionUID = 14L;
 
     /**
      * Each of these fields are initialized to contain an instance of the
@@ -452,10 +453,10 @@ public class FastHashMap<K,V>
             return new KeyIterator();
         }
         public int size() {
-            return counter;
+            return size;
         }
         public boolean isEmpty() {
-            return counter == 0;
+            return size == 0;
         }
         public boolean contains(Object o) {
             return containsKey(o);
@@ -515,10 +516,10 @@ public class FastHashMap<K,V>
             return true;
         }
         public int size() {
-            return counter;
+            return size;
         }
         public boolean isEmpty() {
-            return counter == 0;
+            return size == 0;
         }
         public void clear() {
             FastHashMap.this.clear();
@@ -554,10 +555,10 @@ public class FastHashMap<K,V>
             return new ValueIterator();
         }
         public int size() {
-            return counter;
+            return size;
         }
         public boolean isEmpty() {
-            return counter == 0;
+            return size == 0;
         }
         public boolean contains(Object o) {
             return containsValue(o);
@@ -567,6 +568,64 @@ public class FastHashMap<K,V>
         }
     }
 
-    // ToDo: readObject
-    // ToDo: writeObject
+    /**
+     * Save the state of the <tt>HashMap</tt> instance to a stream (i.e.,
+     * serialize it).
+     *
+     * @serialData The <i>capacity</i> of the HashMap (the length of the
+     *             bucket array) is emitted (int), followed by the
+     *             <i>size</i> (an int, the number of key-value
+     *             mappings), followed by the key (Object) and value (Object)
+     *             for each key-value mapping.  The key-value mappings are
+     *             emitted in no particular order.
+     */
+    private void writeObject(ObjectOutputStream s)
+        throws IOException
+    {
+        // Write out the threshold, loadfactor, and any hidden stuff
+        s.defaultWriteObject();
+
+        // Write out number of buckets
+        s.writeInt(hashLen);
+
+        // Write out size (number of Mappings)
+        s.writeInt(size);
+
+        // Write out keys and values (alternating)
+        for (int i = 0; i < firstEmptyIndex; i++) {
+            if (!isEmpty(i)) {
+                s.writeObject(myKeyValues[i<<1]);
+                s.writeObject(myKeyValues[(i<<1)+1]);
+            }
+        }
+    }
+
+    private static final long serialVersionUID = 362498820763181265L;
+
+    /**
+     * Reconstitute the <tt>HashMap</tt> instance from a stream (i.e.,
+     * deserialize it).
+     */
+    private void readObject(ObjectInputStream s)
+         throws IOException, ClassNotFoundException
+    {
+        // Read in the threshold, loadfactor, and any hidden stuff
+        s.defaultReadObject();
+
+        // Read in number of buckets and allocate the bucket array;
+        hashLen = s.readInt();
+        myKeyValues = new Object[threshold<<1];
+        myIndices = new int[hashLen+threshold];
+        firstDeletedIndex = -1;
+
+        // Read in size (number of Mappings)
+        int size = s.readInt();
+
+        // Read the keys and values, and put the mappings in the HashMap
+        for (int i=0; i<size; i++) {
+            K key = (K) s.readObject();
+            V value = (V) s.readObject();
+            put(key, value); // ToDo: putNew
+        }
+    }
 }
