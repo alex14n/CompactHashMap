@@ -47,7 +47,7 @@ object CompactHashMap {
 
 /**
  */
-@serializable
+@serializable @cloneable
 class CompactHashMap[K,V] (
   private[this] var keyClass: Class[K],
   private[this] var valueClass: Class[V]
@@ -380,11 +380,16 @@ class CompactHashMap[K,V] (
    *  @return a map with the same elements.
    */
   override def clone = {
-    // ToDo: super.clone
-    val newKeys = FixedHashSet (myKeys.bits, keyClass)
-    val newValues = newArray (valueClass, newKeys.capacity)
-    newKeys.copyFrom (myKeys, (i,j) => newValues(i) = myValues(j), true)
-    new CompactHashMap (newKeys, newValues, valueClass)
+    val c = super.clone.asInstanceOf[CompactHashMap[K,V]]
+    c.cloneData
+    c
+  }
+
+  /** Clone internal data declared as private[this]
+   */
+  private def cloneData {
+    myKeys = myKeys.clone
+    if (myValues ne null) myValues = resizeArray (myValues, myValues.length)
   }
 
   /** Returns a new map containing all elements of this map that

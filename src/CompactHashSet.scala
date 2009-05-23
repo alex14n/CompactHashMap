@@ -44,7 +44,7 @@ object CompactHashSet {
 
 /**
  */
-@serializable
+@serializable @cloneable
 class CompactHashSet[T] (elemClass: Class[T])
 extends scala.collection.mutable.Set[T] {
 
@@ -116,7 +116,17 @@ extends scala.collection.mutable.Set[T] {
    *
    *  @return  a set with the same elements.
    */
-  override def clone = new CompactHashSet (fixedSet.clone) // ToDo: super.clone
+  override def clone = {
+    val c = super.clone.asInstanceOf[CompactHashSet[T]]
+    c.cloneData
+    c
+  }
+
+  /** Clone internal data declared as private[this]
+   */
+  private def cloneData {
+    fixedSet = fixedSet.clone
+  }
 
   /** Returns a new set containing all elements of this set that
    *  satisfy the predicate <code>p</code>.
@@ -139,7 +149,7 @@ extends scala.collection.mutable.Set[T] {
 
 /** Hash set backed by fixed size array.
  */
-@serializable
+@serializable @cloneable
 private abstract class FixedHashSet[T] (
   final val bits: Int,
   final val elemClass: Class[T],
@@ -182,11 +192,11 @@ private abstract class FixedHashSet[T] (
 
   /** Array with this set elements.
    */
-  final private[this] val array = a
+  private[this] var array = a
 
   /** Cache array length as local variable
    */
-  final private[this] val arrayLength =
+  private[this] var arrayLength =
     if (array eq null) 0 else array.length
 
   /** Number of elements in this set
@@ -346,7 +356,17 @@ private abstract class FixedHashSet[T] (
 
   /** Make complete copy of this set.
    */
-  override final def clone = FixedHashSet (bits, this) // ToDo: super.clone
+  override def clone = {
+    val c = super.clone.asInstanceOf[FixedHashSet[T]]
+    c.cloneData
+    c
+  }
+
+  /** Clone internal data declared as private[this]
+   */
+  protected def cloneData {
+    if (array ne null) array = resizeArray (array, array.length)
+  }
 
   /** Removes all elements from the set.
    */
@@ -523,7 +543,7 @@ private final object FixedHashSet {
   @serializable
   final class ByteHashSet[T] (bits: Int, elemClass: Class[T], a: Array[T])
   extends FixedHashSet[T] (bits, elemClass, a) {
-    private[this] final val indexTable = new Array[Byte] (2 << bits)
+    private[this] var indexTable = new Array[Byte] (2 << bits)
     final def getIndexArray = indexTable
 
     // make -1 default instead of 0
@@ -534,6 +554,11 @@ private final object FixedHashSet {
     protected final def setNextIndex (i: Int, v: Int) =
       indexTable(len+i) = (~v).asInstanceOf[Byte]
 
+    override def cloneData {
+      super.cloneData
+      indexTable = copyOf (indexTable, 2 << bits)
+      localArray = getArray
+    }
     final override def clear {
       super.clear
       fill(indexTable, 0.asInstanceOf[Byte])
@@ -542,10 +567,10 @@ private final object FixedHashSet {
 
     // 'inline' some methods for better performance
 
-    final private[this] val len = 1 << bits
+    private[this] val len = 1 << bits
     // scalac treat 'array' as method call :-(
     // until it's private[this] so make a local copy
-    final private[this] val localArray = a
+    private[this] var localArray = a
     final override def positionOf[B >: T] (elem: B) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
@@ -563,7 +588,6 @@ private final object FixedHashSet {
       val next = indexTable(len+i)
       next == 0 || next > 1
     }
-    // ToDo: Check if System.arraycopy() is slow on small arrays
     final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit, copyValues: Boolean) {
       val array2 = that.getArray
       val size2 = if (array2 eq null) 0 else array2.length
@@ -652,7 +676,7 @@ private final object FixedHashSet {
   @serializable
   final class ShortHashSet[T] (bits: Int, elemClass: Class[T], a: Array[T])
   extends FixedHashSet[T] (bits, elemClass, a) {
-    private[this] final val indexTable = new Array[Short] (2 << bits)
+    private[this] var indexTable = new Array[Short] (2 << bits)
     final def getIndexArray = indexTable
 
     protected final def firstIndex (i: Int) = ~indexTable(i)
@@ -662,6 +686,11 @@ private final object FixedHashSet {
     protected final def setNextIndex (i: Int, v: Int) =
       indexTable(len+i) = (~v).asInstanceOf[Short]
 
+    override def cloneData {
+      super.cloneData
+      indexTable = copyOf (indexTable, 2 << bits)
+      localArray = getArray
+    }
     final override def clear {
       super.clear
       fill(indexTable, 0.asInstanceOf[Short])
@@ -670,8 +699,8 @@ private final object FixedHashSet {
 
     // 'inline' some methods for better performance
 
-    final private[this] val len = 1 << bits
-    final private[this] val localArray = a
+    private[this] val len = 1 << bits
+    private[this] var localArray = a
     final override def positionOf[B >: T] (elem: B) = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
@@ -777,7 +806,7 @@ private final object FixedHashSet {
   @serializable
   final class IntHashSet[T] (bits: Int, elemClass: Class[T], a: Array[T])
   extends FixedHashSet[T] (bits, elemClass, a) {
-    private[this] final val indexTable = new Array[Int] (2 << bits)
+    private[this] var indexTable = new Array[Int] (2 << bits)
     final def getIndexArray = indexTable
 
     protected final def firstIndex (i: Int) = ~indexTable(i)
@@ -785,6 +814,11 @@ private final object FixedHashSet {
     protected final def setFirstIndex (i: Int, v: Int) = indexTable(i) = ~v
     protected final def setNextIndex (i: Int, v: Int) = indexTable(len+i) = ~v
 
+    override def cloneData {
+      super.cloneData
+      indexTable = copyOf (indexTable, 2 << bits)
+      localArray = getArray
+    }
     final override def clear {
       super.clear
       fill(indexTable, 0)
@@ -793,8 +827,8 @@ private final object FixedHashSet {
 
     // 'inline' some methods for better performance
 
-    final private[this] val len = 1 << bits
-    final private[this] val localArray = a
+    private[this] val len = 1 << bits
+    private[this] var localArray = a
     final override def positionOf[B >: T] (elem: B): Int = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
@@ -964,7 +998,7 @@ private final object FixedHashSet {
   @serializable
   final class IntObjectHashSet[T] (bits: Int, elemClass: Class[T], a: Array[T])
   extends FixedHashSet[T] (bits, elemClass, a) {
-    private[this] final val indexTable = new Array[Int] (2 << bits)
+    private[this] var indexTable = new Array[Int] (2 << bits)
     final def getIndexArray = indexTable
 
     protected final def firstIndex (i: Int) = ~indexTable(i)
@@ -972,6 +1006,11 @@ private final object FixedHashSet {
     protected final def setFirstIndex (i: Int, v: Int) = indexTable(i) = ~v
     protected final def setNextIndex (i: Int, v: Int) = indexTable(len+i) = ~v
 
+    override def cloneData {
+      super.cloneData
+      indexTable = copyOf (indexTable, 2 << bits)
+      localArray = getArray.asInstanceOf[BoxedObjectArray].value
+    }
     final override def clear {
       super.clear
       fill(indexTable, 0)
@@ -980,8 +1019,8 @@ private final object FixedHashSet {
 
     // 'inline' some methods for better performance
 
-    final private[this] val len = 1 << bits
-    final private[this] val localArray: Array[Object] = a.asInstanceOf[BoxedObjectArray].value
+    private[this] val len = 1 << bits
+    private[this] var localArray: Array[Object] = a.asInstanceOf[BoxedObjectArray].value
     final override def positionOf[B >: T] (elem: B): Int = {
       val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
       val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h

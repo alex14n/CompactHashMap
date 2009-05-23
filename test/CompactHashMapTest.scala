@@ -181,4 +181,12 @@ class CompactHashMapTest {
     assertEquals (20, map(null))
     assertEquals (3, map(""))
   }
+
+  @Test def testClone {
+    val map = CompactHashMap[String,String]
+    map("a") = "b"
+    val mapClone = map.clone
+    map("a") = "x"
+    assertEquals("b", mapClone("a"))
+  }
 }

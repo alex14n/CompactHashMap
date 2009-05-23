@@ -161,9 +161,21 @@ class CompactHashSetTest {
   }
 
   @Test def testToList {
-    val list1 = 1 to 1000 toList // ToDo: StackOverflow in List.equals
+    val list1 = 1 to 1000 toList
     val set = CompactHashSet (list1: _*)
     val list2 = set.toList
     assertEquals (list1, list2)
+  }
+
+  @Test def testClone {
+    val set = CompactHashSet[String]
+    set += "a"
+    set += "b"
+    set += "c"
+    val setClone = set.clone
+    set -= "b"
+    assertEquals(3, setClone.size)
+    set += "d"
+    assertTrue(setClone.contains("b"))
   }
 }
