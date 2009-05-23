@@ -26,7 +26,7 @@ public class FastHashMap<K,V>
 
     /**
      * Maximum allowed load factor, since element index bits
-     * cannot exceed number hash bits (rest bits are used to store hashcode).
+     * cannot exceed number of hash bits (other bits are used to store hashcode).
      */
     static final float MAXIMUM_LOAD_FACTOR = 1f;
 
