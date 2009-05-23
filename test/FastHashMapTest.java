@@ -191,6 +191,7 @@ public class FastHashMapTest {
   @Test public void testClone () {
     FastHashMap<String,String> map = new FastHashMap<String,String> ();
     map.put("a","b");
+    Set<String> mapKeys = map.keySet();
     FastHashMap<String,String> clone = map.clone();
     clone.put("a", "c");
     map.put("b", "d");
@@ -198,8 +199,12 @@ public class FastHashMapTest {
     assertEquals("c", clone.get("a"));
     assertEquals("d", map.get("b"));
     assertFalse(clone.containsKey("b"));
-  }
 
+    Set<String> cloneKeys = clone.keySet();
+    assertTrue(mapKeys.contains("b"));
+    assertFalse(cloneKeys.contains("b"));
+    assertTrue(mapKeys != cloneKeys);
+  }
 
   @Test public void testReadWrite () throws IOException, ClassNotFoundException {
     ByteArrayOutputStream bos = new ByteArrayOutputStream();

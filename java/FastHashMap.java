@@ -414,6 +414,9 @@ public class FastHashMap<K,V>
         }
         that.myKeyValues = myKeyValues.clone();
         that.myIndices = myIndices.clone();
+        that.keySet = null;
+        that.values = null;
+        that.entrySet = null;
         return that;
     }
 
