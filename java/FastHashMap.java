@@ -3,6 +3,11 @@ import java.io.*;
 import java.lang.reflect.Array;
 
 /**
+ * Fast HashMap implementation.
+ *
+ * Some benchmark results:
+ * http://forums.sun.com/thread.jspa?threadID=5387181
+ *
  * @author  Alex Yakovlev
  */
 public class FastHashMap<K,V>
@@ -20,6 +25,32 @@ public class FastHashMap<K,V>
     static final float DEFAULT_LOAD_FACTOR = 0.75f;
 
     /**
+     * Maximum allowed load factor, since element index bits
+     * cannot exceed number hash bits (rest bits are used to store hashcode).
+     */
+    static final float MAXIMUM_LOAD_FACTOR = 1f;
+
+    /**
+     * Bits available to store indices and hashcode bits.
+     * Now the highest (31st) bit (negative/inverted values) is used as deleted flag,
+     * 30th bit is used to mark end of list, thus 30 bits are available.
+     */
+    private final static int AVAILABLE_BITS = 0x3FFFFFFF;
+
+    /**
+     * Bit flag marking the end of list of elements with the same hashcode,
+     * or end of deleted list.
+     */
+    private final static int END_OF_LIST = 0x40000000;
+
+    /**
+     * The maximum capacity, used if a higher value is implicitly specified
+     * by either of the constructors with arguments.
+     * MUST be a power of two <= 1<<30.
+     */
+    static final int MAXIMUM_CAPACITY = 1 << 30;
+
+    /**
      * Applies a supplemental hash function to a given object's hashCode,
      * which defends against poor quality hash functions. This is critical
      * because HashMap uses power-of-two length hash tables, that
@@ -34,11 +65,54 @@ public class FastHashMap<K,V>
         return (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h;
     }
 
+    /**
+     * The number of key-value mappings contained in this map.
+     */
     transient private int size = 0;
+
+    /**
+     * Arrays with stored keys and values.
+     * Storing them in one array in neighbour cells
+     * is faster since it's reading adjacent memory addresses.
+     */
     transient private Object[] myKeyValues;
+
+    /**
+     * Array of complex indices.
+     *
+     * First <tt>hashLen</tt> are hashcode-to-array maps,
+     * next <tt>threshold</tt> maps to next element with the same hashcode.
+     * Highest index bit (negative/inverted values) is used as deleted flag,
+     * 30th bit is used to mark last element in list,
+     * lowest bits are real index in array,
+     * and in the middle hashcode bits is stored.
+     *
+     * Because of new arrays are initialised with zeroes,
+     * and we want to minimise number of memory writes,
+     * we leave 0 as value of 'unoccupied' entry,
+     * and invert real indices values.
+     * We also need to store deleted entries list,
+     * and to easily check if entry is occupied or not during iteration
+     * deleted indices are not inverted and stored as positive,
+     * but to separate them from default zero value we add 1 to them.
+     */
     transient private int[] myIndices;
+
+    /**
+     * Index of the first not occupied position in array.
+     * All elements starting with this index are free.
+     */
     transient private int firstEmptyIndex = 0;
+
+    /**
+     * Index of first element in deleted list,
+     * or -1 if no elements are deleted.
+     */
     transient private int firstDeletedIndex = -1;
+
+    /**
+     * Number of hash baskets, power of 2.
+     */
     transient private int hashLen;
 
     /**
@@ -52,9 +126,6 @@ public class FastHashMap<K,V>
      * @serial
      */
     final float loadFactor;
-
-    private final static int AVAILABLE_BITS = 0x3FFFFFFF;
-    private final static int NEXT_IS_EOL = 0x40000000;
 
     /**
      * Constructs an empty <tt>HashMap</tt> with the default initial capacity
@@ -75,15 +146,25 @@ public class FastHashMap<K,V>
      * @param  initialCapacity the initial capacity
      * @param  loadFactor      the load factor
      * @throws IllegalArgumentException if the initial capacity is negative
-     *         or the load factor is nonpositive
+     *         or the load factor is greater than one or is too low
      */
     public FastHashMap(int initialCapacity, float loadFactor) {
-        // ToDo: throw new IllegalArgumentException
+        if (initialCapacity < 0)
+            throw new IllegalArgumentException(
+                "Illegal initial capacity: " + initialCapacity);
+        if (initialCapacity > MAXIMUM_CAPACITY)
+            initialCapacity = MAXIMUM_CAPACITY;
+        if (loadFactor > MAXIMUM_LOAD_FACTOR ||
+            Float.isNaN(loadFactor))
+            throw new IllegalArgumentException(
+                "Illegal load factor: " + loadFactor);
         this.loadFactor = loadFactor;
-        for (hashLen = DEFAULT_INITIAL_CAPACITY;
-             hashLen < initialCapacity;
-             hashLen <<= 1);
+        // Find a power of 2 >= initialCapacity
+        for (hashLen = DEFAULT_INITIAL_CAPACITY; hashLen < initialCapacity; hashLen <<= 1);
         threshold = (int)(hashLen * loadFactor);
+        if (threshold < 1)
+            throw new IllegalArgumentException(
+                "Illegal load factor: " + loadFactor);
         myKeyValues = new Object[threshold<<1];
         myIndices = new int[hashLen+threshold];
     }
@@ -99,6 +180,9 @@ public class FastHashMap<K,V>
         this(initialCapacity, DEFAULT_LOAD_FACTOR);
     }
 
+    /**
+     * Increase size of internal arrays two times.
+     */
     final private void resize() {
         int newHashLen = hashLen << 1;
         int newValueLen = (int)(newHashLen * loadFactor);
@@ -112,15 +196,19 @@ public class FastHashMap<K,V>
             int arrayIndex;
             for (int j = ~myIndices[i]; j >= 0; j = ~myIndices[hashLen + arrayIndex]) {
                 arrayIndex = j & (hashLen-1);
-                int hashIndex = i | (j & (newMask ^ mask));
-                if (hashIndex == i) {
+                int newHashIndex = i | (j & (newMask ^ mask));
+                // Each old element from the old hash basket may go
+                // either to the same basket in increased hash table
+                // (if new highest bit is zero)
+                // or to (i + hashLen) if new highest bit is 1.
+                if (newHashIndex == i) {
                     if (next1 < 0) newIndices[newHashLen + arrayIndex] = next1;
-                    next1 = ~(arrayIndex | (j & newMask) | (next1 < 0 ? 0 : NEXT_IS_EOL));
+                    next1 = ~(arrayIndex | (j & newMask) | (next1 < 0 ? 0 : END_OF_LIST));
                 } else {
                     if (next2 < 0) newIndices[newHashLen + arrayIndex] = next2;
-                    next2 = ~(arrayIndex | (j & newMask) | (next2 < 0 ? 0 : NEXT_IS_EOL));
+                    next2 = ~(arrayIndex | (j & newMask) | (next2 < 0 ? 0 : END_OF_LIST));
                 }
-                if ((j & NEXT_IS_EOL) != 0) break;
+                if ((j & END_OF_LIST) != 0) break;
             }
             if (next1 < 0) newIndices[i] = next1;
             if (next2 < 0) newIndices[i + hashLen] = next2;
@@ -131,8 +219,14 @@ public class FastHashMap<K,V>
         myIndices = newIndices;
     }
 
-    final private int positionOf(Object elem) {
-        int hc = hash(elem);
+    /**
+     * Returns the index of key in internal arrays if it is present.
+     *
+     * @param key key
+     * @return index of key in array or -1 if it was not found
+     */
+    final private int positionOf(Object key) {
+        int hc = hash(key);
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         int prev = -1;
@@ -140,17 +234,26 @@ public class FastHashMap<K,V>
         for (int i = ~myIndices[curr]; i >= 0; i = ~myIndices[curr]) {
             prev = curr;
             curr = i & (hashLen-1);
+            // Check if stored hashcode bits are equal
+            // to hashcode of the key we are looking for
             if (hcBits == (i & mask)) {
                 Object x = myKeyValues[curr<<1];
-                if (x == elem || x != null && x.equals(elem))
+                if (x == key || x != null && x.equals(key))
                     return curr;
             }
-            if ((i & NEXT_IS_EOL) != 0) return -1;
+            if ((i & END_OF_LIST) != 0) return -1;
             curr += hashLen;
         }
         return -1;
     }
 
+    /**
+     * Returns <tt>true</tt> if i-th array position
+     * is not occupied (is in deleted elements list).
+     *
+     * @param i index in array, must be less than firstEmptyIndex
+     * @return <tt>true</tt> if i-th is empty (was deleted)
+     */
     final private boolean isEmpty(int i) {
         return /* i >= firstEmptyIndex || */ i == firstDeletedIndex || myIndices[hashLen+i] > 0;
     }
@@ -185,7 +288,7 @@ public class FastHashMap<K,V>
                     return (V)oldValue;
                 }
             }
-            if ((j & NEXT_IS_EOL) != 0) break;
+            if ((j & END_OF_LIST) != 0) break;
         }
         // Resize if needed
         if (size >= threshold) {
@@ -197,10 +300,11 @@ public class FastHashMap<K,V>
         }
         // Find a place for new element
         int newIndex;
+        // First we reuse deleted positions
         if (firstDeletedIndex >= 0) {
             newIndex = firstDeletedIndex;
             int di = myIndices[hashLen+firstDeletedIndex];
-            if (di == NEXT_IS_EOL)
+            if (di == END_OF_LIST)
                 firstDeletedIndex = -1;
             else
                 firstDeletedIndex = di-1;
@@ -213,7 +317,7 @@ public class FastHashMap<K,V>
         myKeyValues[newIndex<<1] = key;
         myKeyValues[(newIndex<<1)+1] = value;
         if (next < 0) myIndices[hashLen + newIndex] = next;
-        myIndices[i] = ~(newIndex | hcBits | (next < 0 ? 0 : NEXT_IS_EOL));
+        myIndices[i] = ~(newIndex | hcBits | (next < 0 ? 0 : END_OF_LIST));
         size++;
         return null;
     }
@@ -232,8 +336,17 @@ public class FastHashMap<K,V>
       return result == NOT_FOUND ? null : result;
     }
 
+    /**
+     * Value to distinguish null as 'key not found' from null as real value.
+     */
     private static Object NOT_FOUND = new Object();
 
+    /**
+     * Removes the mapping for the specified key from this map if present.
+     *
+     * @param key key whose mapping is to be removed from the map
+     * @return NOT_FOUND or old value
+     */
     final private V removeKey(Object key) {
         int hc = hash(key);
         int h = hc & (hashLen-1);
@@ -248,9 +361,9 @@ public class FastHashMap<K,V>
                 Object o = myKeyValues[j<<1];
                 if (o == key || o != null && o.equals(key)) {
                     size--;
-                    if((i & NEXT_IS_EOL) != 0) {
+                    if((i & END_OF_LIST) != 0) {
                         if (prev >= 0)
-                            myIndices[prev] ^= NEXT_IS_EOL;
+                            myIndices[prev] ^= END_OF_LIST;
                         else
                             myIndices[curr] = 0;
                     } else {
@@ -259,7 +372,7 @@ public class FastHashMap<K,V>
                     if (j == firstEmptyIndex-1) {
                         firstEmptyIndex = j;
                     } else {
-                        myIndices[k] = firstDeletedIndex < 0 ? NEXT_IS_EOL : firstDeletedIndex+1;
+                        myIndices[k] = firstDeletedIndex < 0 ? END_OF_LIST : firstDeletedIndex+1;
                         firstDeletedIndex = j;
                     }
                     Object oldValue = myKeyValues[(j<<1)+1];
@@ -268,7 +381,7 @@ public class FastHashMap<K,V>
                     return (V)oldValue;
                 }
             }
-            if ((i & NEXT_IS_EOL) != 0) break;
+            if ((i & END_OF_LIST) != 0) break;
             prev = curr;
             curr = k;
         }
