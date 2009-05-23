@@ -6,13 +6,21 @@ final class HashCached (final val i: Int) {
   }
 }
 
+final class Pos(private[this] val x:Int, private[this] val y:Int) {
+  final override def hashCode = x ^ y
+}
+
 object Benchmark {
   private[this] val iterations = 0x180000
   final def intKey(i: Int) = i*123
 
+  type T = Pos
+  val rnd = new java.util.Random
+  private[this] val values = (0 to iterations*2).toList map { x => new Pos(rnd.nextInt, rnd.nextInt) } toArray
+/*
   type T = Object
   private[this] val values = (0 to iterations*2).toList map { x => new Object } toArray
-/*
+
   type T = String
   private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
 
@@ -186,6 +194,9 @@ object Benchmark {
     "compactWrite" -> {() => scalaWrite (new CompactHashMap)},
     "compactReadFull" -> scalaReadFull _,
     "compactReadEmpty" -> scalaReadEmpty _,
+    "scalaWrite" -> {() => scalaWrite (new scala.collection.mutable.HashMap)},
+    "scalaReadFull" -> scalaReadFull _,
+    "scalaReadEmpty" -> scalaReadEmpty _,
 /*
     "fastutilWrite" -> {() => javaWrite(new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap)},
     "fastutilReadFull" -> javaReadFull _,
@@ -202,9 +213,6 @@ object Benchmark {
     "troveWrite" -> {() => javaWrite(new gnu.trove.THashMap)},
     "troveReadFull" -> javaReadFull _,
     "troveReadEmpty" -> javaReadEmpty _,
-    "scalaWrite" -> {() => scalaWrite (new scala.collection.mutable.HashMap)},
-    "scalaReadFull" -> scalaReadFull _,
-    "scalaReadEmpty" -> scalaReadEmpty _,
 */
   )
 
