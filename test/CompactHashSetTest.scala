@@ -173,9 +173,14 @@ class CompactHashSetTest {
     set += "b"
     set += "c"
     val setClone = set.clone
+    assertTrue (setClone.isInstanceOf[CompactHashSet[_]])
+
     set -= "b"
     assertEquals(3, setClone.size)
     set += "d"
     assertTrue(setClone.contains("b"))
+
+    assertEquals(List("a", "b", "c"), setClone.toList)
+    assertEquals(List("a", "d", "c"), set.toList)
   }
 }

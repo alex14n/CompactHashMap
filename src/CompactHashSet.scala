@@ -81,18 +81,18 @@ extends scala.collection.mutable.Set[T] {
     fixedSet.add (elem)
   } catch {
     case e: ResizeNeeded =>
-      val newFixedSet = FixedHashSet (
-        fixedSet.bits + 1,
-        // determine elements class by first inserted object
-        // if it was not specified during set creation
-        if (elemClass ne null) elemClass else
-          if (fixedSet.elemClass ne null) fixedSet.elemClass else (
-            if (elem.asInstanceOf[Object] eq null) classOf[Object] else
-              elem.asInstanceOf[Object].getClass
-          ).asInstanceOf[Class[T]]
-      )
-      newFixedSet.copyFrom (fixedSet, null, true)
-      fixedSet = newFixedSet
+      if (fixedSet.elemClass ne null)
+        fixedSet = FixedHashSet (fixedSet.bits + 1, fixedSet)
+      else
+        fixedSet = FixedHashSet (
+          fixedSet.bits + 1,
+          // determine elements class by first inserted object
+          // if it was not specified during set creation
+          if (elemClass ne null) elemClass else (
+              if (elem.asInstanceOf[Object] eq null) classOf[Object] else
+                elem.asInstanceOf[Object].getClass
+            ).asInstanceOf[Class[T]]
+        )
       fixedSet.add (elem)
   }
 
@@ -306,7 +306,7 @@ private abstract class FixedHashSet[T] (
    *  @param  callback  function to call for each copied element
    *                    with its new and old indices in set's arrays.
    */
-  def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit, copyValues: Boolean)
+  def rehash (that: FixedHashSet[T])
 
   /** Make copy of this set filtered by predicate.
    *
@@ -588,61 +588,50 @@ private final object FixedHashSet {
       val next = indexTable(len+i)
       next == 0 || next > 1
     }
-    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit, copyValues: Boolean) {
+    final override def rehash (that: FixedHashSet[T]) {
       val array2 = that.getArray
-      val size2 = if (array2 eq null) 0 else array2.length
+      if (array2 eq null) return
+      val size2 = array2.length
       var i = 0
-      if (size2 == that.size) {
-        fill (indexTable, len, len+size2, 1.asInstanceOf[Byte])
-        val mask = BYTE_AVAILABLE_BITS ^ (len-1)
-        val mask2 = that.hcBitmask
-        if ((mask2 & mask) == mask) {
-          val index2 = that.getIndexArray.asInstanceOf[Array[Byte]]
-          while (i < size2) {
-            var j = ~index2(i)
-            var next1: Byte = 0
-            var next2: Byte = 0
-            while (j >= 0) {
-              val arrayIndex = j & (size2-1)
-              val hashIndex = i | (j & (mask ^ mask2))
-              if (hashIndex == i) {
-                if (next1 < 0) indexTable (len + arrayIndex) = next1
-                next1 = (~arrayIndex ^ (j & mask)).asInstanceOf[Byte]
-              } else {
-                if (next2 < 0) indexTable (len + arrayIndex) = next2
-                next2 = (~arrayIndex ^ (j & mask)).asInstanceOf[Byte]
-              }
-              // if (null ne callback) callback(arrayIndex, arrayIndex)
-              j = ~index2(size2 + arrayIndex)
-            }
-            if (next1 < 0) indexTable (i) = next1
-            if (next2 < 0) indexTable (i + size2) = next2
-            i += 1
-          }
-        } else
-          while (i < size2) {
-          val e = array2(i)
-          // inline addNew
-          val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
-          val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
-          val j = hc & (len - 1)
-          val next = indexTable(j)
-          indexTable (j) = (~i ^ (hc & mask)).asInstanceOf[Byte]
-          if (next < 0) indexTable (len+i) = next
-          if (null ne callback) callback(i, i)
-          i += 1
-        }
-        if (copyValues && (array2 ne null)) array2.copyToArray (localArray, 0)
-        setSize (size2)
-      } else {
+      //
+      fill (indexTable, len, len+size2, 1.asInstanceOf[Byte])
+      val mask = BYTE_AVAILABLE_BITS ^ (len-1)
+      val mask2 = that.hcBitmask
+      if ((mask2 & mask) == mask) {
+        val index2 = that.getIndexArray.asInstanceOf[Array[Byte]]
         while (i < size2) {
-          if (!that.isEmpty(i)) {
-            val i2 = addNew (array2(i))
-            if (null ne callback) callback(i2, i)
+          var j = ~index2(i)
+          var next1: Byte = 0
+          var next2: Byte = 0
+          while (j >= 0) {
+            val arrayIndex = j & (size2-1)
+            val hashIndex = i | (j & (mask ^ mask2))
+            if (hashIndex == i) {
+              if (next1 < 0) indexTable (len + arrayIndex) = next1
+              next1 = (~arrayIndex ^ (j & mask)).asInstanceOf[Byte]
+            } else {
+              if (next2 < 0) indexTable (len + arrayIndex) = next2
+              next2 = (~arrayIndex ^ (j & mask)).asInstanceOf[Byte]
+            }
+            j = ~index2(size2 + arrayIndex)
           }
+          if (next1 < 0) indexTable (i) = next1
+          if (next2 < 0) indexTable (i + size2) = next2
           i += 1
         }
+      } else
+        while (i < size2) {
+        val e = array2(i)
+        // inline addNew
+        val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
+        val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
+        val j = hc & (len - 1)
+        val next = indexTable(j)
+        indexTable (j) = (~i ^ (hc & mask)).asInstanceOf[Byte]
+        if (next < 0) indexTable (len+i) = next
+        i += 1
       }
+      setSize (size2)
     }
     final override def add (elem: T): Int = {
       // (inline hashCode) position in firstIndex table
@@ -718,61 +707,50 @@ private final object FixedHashSet {
       val next = indexTable(len+i)
       next == 0 || next > 1
     }
-    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit, copyValues: Boolean) {
+    final override def rehash (that: FixedHashSet[T]) {
       val array2 = that.getArray
-      val size2 = if (array2 eq null) 0 else array2.length
+      if (array2 eq null) return
+      val size2 = array2.length
       var i = 0
-      if (size2 == that.size) {
-        fill (indexTable, len, len+size2, 1.asInstanceOf[Short])
-        val mask = SHORT_AVAILABLE_BITS ^ (len-1)
-        val mask2 = that.hcBitmask
-        if ((mask2 & mask) == mask) {
-          val index2 = that.getIndexArray.asInstanceOf[Array[Short]]
-          while (i < size2) {
-            var j = ~index2(i)
-            var next1: Short = 0
-            var next2: Short = 0
-            while (j >= 0) {
-              val arrayIndex = j & (size2-1)
-              val hashIndex = i | (j & (mask ^ mask2))
-              if (hashIndex == i) {
-                if (next1 < 0) indexTable (len + arrayIndex) = next1
-                next1 = (~arrayIndex ^ (j & mask)).asInstanceOf[Short]
-              } else {
-                if (next2 < 0) indexTable (len + arrayIndex) = next2
-                next2 = (~arrayIndex ^ (j & mask)).asInstanceOf[Short]
-              }
-              // if (null ne callback) callback(arrayIndex, arrayIndex)
-              j = ~index2(size2 + arrayIndex)
-            }
-            if (next1 < 0) indexTable (i) = next1
-            if (next2 < 0) indexTable (i + size2) = next2
-            i += 1
-          }
-        } else
-          while (i < size2) {
-          val e = array2(i)
-          // inline addNew
-          val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
-          val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
-          val j = hc & (len - 1)
-          val next = indexTable(j)
-          indexTable (j) = (~i ^ (hc & mask)).asInstanceOf[Short]
-          if (next < 0) indexTable (len+i) = next
-          if (null ne callback) callback(i, i)
-          i += 1
-        }
-        if (copyValues && (array2 ne null)) array2.copyToArray (localArray, 0)
-        setSize (size2)
-      } else {
+      //
+      fill (indexTable, len, len+size2, 1.asInstanceOf[Short])
+      val mask = SHORT_AVAILABLE_BITS ^ (len-1)
+      val mask2 = that.hcBitmask
+      if ((mask2 & mask) == mask) {
+        val index2 = that.getIndexArray.asInstanceOf[Array[Short]]
         while (i < size2) {
-          if (!that.isEmpty(i)) {
-            val i2 = addNew (array2(i))
-            if (null ne callback) callback(i2, i)
+          var j = ~index2(i)
+          var next1: Short = 0
+          var next2: Short = 0
+          while (j >= 0) {
+            val arrayIndex = j & (size2-1)
+            val hashIndex = i | (j & (mask ^ mask2))
+            if (hashIndex == i) {
+              if (next1 < 0) indexTable (len + arrayIndex) = next1
+              next1 = (~arrayIndex ^ (j & mask)).asInstanceOf[Short]
+            } else {
+              if (next2 < 0) indexTable (len + arrayIndex) = next2
+              next2 = (~arrayIndex ^ (j & mask)).asInstanceOf[Short]
+            }
+            j = ~index2(size2 + arrayIndex)
           }
+          if (next1 < 0) indexTable (i) = next1
+          if (next2 < 0) indexTable (i + size2) = next2
           i += 1
         }
+      } else
+        while (i < size2) {
+        val e = array2(i)
+        // inline addNew
+        val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
+        val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
+        val j = hc & (len - 1)
+        val next = indexTable(j)
+        indexTable (j) = (~i ^ (hc & mask)).asInstanceOf[Short]
+        if (next < 0) indexTable (len+i) = next
+        i += 1
       }
+      setSize (size2)
     }
     final override def add (elem: T): Int = {
       // (inline hashCode) position in firstIndex table
@@ -882,61 +860,50 @@ private final object FixedHashSet {
       val next = indexTable(len+i)
       next == 0 || next > 1
     }
-    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit, copyValues: Boolean) {
+    final override def rehash (that: FixedHashSet[T]) {
       val array2 = that.getArray
-      val size2 = if (array2 eq null) 0 else array2.length
+      if (array2 eq null) return
+      val size2 = array2.length
       var i = 0
-      if (size2 == that.size) {
-        fill (indexTable, len, len+size2, 1)
-        val mask = INT_AVAILABLE_BITS ^ (len-1)
-        val mask2 = that.hcBitmask
-        if ((mask2 & mask) == mask) {
-          val index2 = that.getIndexArray.asInstanceOf[Array[Int]]
-          while (i < size2) {
-            var j = ~index2(i)
-            var next1 = 0
-            var next2 = 0
-            while (j >= 0) {
-              val arrayIndex = j & (size2-1)
-              val hashIndex = i | (j & (mask ^ mask2))
-              if (hashIndex == i) {
-                if (next1 < 0) indexTable (len + arrayIndex) = next1
-                next1 = ~(arrayIndex | (j & mask) | (if (next1 < 0) 0 else INT_NEXT_IS_EOL))
-              } else {
-                if (next2 < 0) indexTable (len + arrayIndex) = next2
-                next2 = ~(arrayIndex | (j & mask) | (if (next2 < 0) 0 else INT_NEXT_IS_EOL))
-              }
-              // if (null ne callback) callback(arrayIndex, arrayIndex)
-              j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~index2(size2 + arrayIndex)
-            }
-            if (next1 < 0) indexTable (i) = next1
-            if (next2 < 0) indexTable (i + size2) = next2
-            i += 1
-          }
-        } else
-          while (i < size2) {
-          val e = array2(i)
-          // inline addNew
-          val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
-          val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
-          val j = hc & (len - 1)
-          val next = indexTable(j)
-          indexTable (j) = ~(i | (hc & mask))
-          if (next < 0) indexTable (len+i) = next
-          if (null ne callback) callback(i, i)
-          i += 1
-        }
-        if (copyValues && (array2 ne null)) array2.copyToArray (localArray, 0)
-        setSize (size2)
-      } else {
+      //
+      fill (indexTable, len, len+size2, 1)
+      val mask = INT_AVAILABLE_BITS ^ (len-1)
+      val mask2 = that.hcBitmask
+      if ((mask2 & mask) == mask) {
+        val index2 = that.getIndexArray.asInstanceOf[Array[Int]]
         while (i < size2) {
-          if (!that.isEmpty(i)) {
-            val i2 = addNew (array2(i))
-            if (null ne callback) callback(i2, i)
+          var j = ~index2(i)
+          var next1 = 0
+          var next2 = 0
+          while (j >= 0) {
+            val arrayIndex = j & (size2-1)
+            val hashIndex = i | (j & (mask ^ mask2))
+            if (hashIndex == i) {
+              if (next1 < 0) indexTable (len + arrayIndex) = next1
+              next1 = ~(arrayIndex | (j & mask) | (if (next1 < 0) 0 else INT_NEXT_IS_EOL))
+            } else {
+              if (next2 < 0) indexTable (len + arrayIndex) = next2
+              next2 = ~(arrayIndex | (j & mask) | (if (next2 < 0) 0 else INT_NEXT_IS_EOL))
+            }
+            j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~index2(size2 + arrayIndex)
           }
+          if (next1 < 0) indexTable (i) = next1
+          if (next2 < 0) indexTable (i + size2) = next2
           i += 1
         }
+      } else
+        while (i < size2) {
+        val e = array2(i)
+        // inline addNew
+        val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
+        val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
+        val j = hc & (len - 1)
+        val next = indexTable(j)
+        indexTable (j) = ~(i | (hc & mask))
+        if (next < 0) indexTable (len+i) = next
+        i += 1
       }
+      setSize (size2)
     }
     final override def add (elem: T): Int = {
       // (inline hashCode) position in firstIndex table
@@ -993,7 +960,8 @@ private final object FixedHashSet {
     }
   }
 
-  /** FixedHashSet implementation with int-size index arrays.
+  /** FixedHashSet implementation with int-size index arrays
+   * and unboxed array of Objects.
    */
   @serializable
   final class IntObjectHashSet[T] (bits: Int, elemClass: Class[T], a: Array[T])
@@ -1048,76 +1016,51 @@ private final object FixedHashSet {
       val next = indexTable(len+i)
       next == 0 || next > 1
     }
-    final override def copyFrom (that: FixedHashSet[T], callback: (Int,Int) => Unit, copyValues: Boolean) {
+    final override def rehash (that: FixedHashSet[T]) {
       val array2 = that.getArray
-      val size2 = if (array2 eq null) 0 else array2.length
+      if (array2 eq null) return
+      val size2 = array2.length
       var i = 0
-      if (size2 == that.size) {
-        fill (indexTable, len, len+size2, 1)
-        val mask = INT_AVAILABLE_BITS ^ (len-1)
-        val mask2 = that.hcBitmask
-        if ((mask2 & mask) == mask) {
-          val index2 = that.getIndexArray.asInstanceOf[Array[Int]]
-          while (i < size2) {
-            var j = ~index2(i)
-            var next1 = 0
-            var next2 = 0
-            while (j >= 0) {
-              val arrayIndex = j & (size2-1)
-              val hashIndex = i | (j & (mask ^ mask2))
-              if (hashIndex == i) {
-                if (next1 < 0) indexTable (len + arrayIndex) = next1
-                next1 = ~(arrayIndex | (j & mask) | (if (next1 < 0) 0 else INT_NEXT_IS_EOL))
-              } else {
-                if (next2 < 0) indexTable (len + arrayIndex) = next2
-                next2 = ~(arrayIndex | (j & mask) | (if (next2 < 0) 0 else INT_NEXT_IS_EOL))
-              }
-              // if (null ne callback) callback(arrayIndex, arrayIndex)
-              j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~index2(size2 + arrayIndex)
+      //
+      fill (indexTable, len, len+size2, 1)
+      val mask = INT_AVAILABLE_BITS ^ (len-1)
+      val mask2 = that.hcBitmask
+      if ((mask2 & mask) == mask) {
+        val index2 = that.getIndexArray.asInstanceOf[Array[Int]]
+        while (i < size2) {
+          var j = ~index2(i)
+          var next1 = 0
+          var next2 = 0
+          while (j >= 0) {
+            val arrayIndex = j & (size2-1)
+            val hashIndex = i | (j & (mask ^ mask2))
+            if (hashIndex == i) {
+              if (next1 < 0) indexTable (len + arrayIndex) = next1
+              next1 = ~(arrayIndex | (j & mask) | (if (next1 < 0) 0 else INT_NEXT_IS_EOL))
+            } else {
+              if (next2 < 0) indexTable (len + arrayIndex) = next2
+              next2 = ~(arrayIndex | (j & mask) | (if (next2 < 0) 0 else INT_NEXT_IS_EOL))
             }
-            if (next1 < 0) indexTable (i) = next1
-            if (next2 < 0) indexTable (i + size2) = next2
-            i += 1
+            j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~index2(size2 + arrayIndex)
           }
-        } else if (array2.isInstanceOf[BoxedObjectArray]) {
-          val array: Array[Object] = array2.asInstanceOf[BoxedObjectArray].value
-          while (i < size2) {
-            val e = array(i)
-            // inline addNew
-            val h = if (null eq e) 0 else e.hashCode
-            val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
-            val j = hc & (len - 1)
-            val next = indexTable(j)
-            indexTable (j) = ~(i | (hc & mask))
-            if (next < 0) indexTable (len+i) = next
-            if (null ne callback) callback(i, i)
-            i += 1
-          }
-        } else {
-          while (i < size2) {
-            val e = array2(i)
-            // inline addNew
-            val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
-            val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
-            val j = hc & (len - 1)
-            val next = indexTable(j)
-            indexTable (j) = ~(i | (hc & mask))
-            if (next < 0) indexTable (len+i) = next
-            if (null ne callback) callback(i, i)
-            i += 1
-          }
+          if (next1 < 0) indexTable (i) = next1
+          if (next2 < 0) indexTable (i + size2) = next2
+          i += 1
         }
-        if (copyValues && (array2 ne null)) array2.copyToArray (getArray, 0)
-        setSize (size2)
       } else {
         while (i < size2) {
-          if (!that.isEmpty(i)) {
-            val i2 = addNew (array2(i))
-            if (null ne callback) callback(i2, i)
-          }
+          val e = array2(i)
+          // inline addNew
+          val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
+          val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
+          val j = hc & (len - 1)
+          val next = indexTable(j)
+          indexTable (j) = ~(i | (hc & mask))
+          if (next < 0) indexTable (len+i) = next
           i += 1
         }
       }
+      setSize (size2)
     }
     final override def add (elem: T): Int = {
       // (inline hashCode) position in firstIndex table
@@ -1158,7 +1101,7 @@ private final object FixedHashSet {
     protected final def setNextIndex (i: Int, v: Int) { }
     final def hcBitmask = 0
     final def getIndexArray = null
-    final def copyFrom (that: FixedHashSet[Any], callback: (Int,Int) => Unit, copyValues: Boolean) { }
+    final def rehash (that: FixedHashSet[Any]) { }
     final override def add (elem: Any): Int = { throw new ResizeNeeded }
   }
 
@@ -1179,7 +1122,7 @@ private final object FixedHashSet {
         new IntHashSet (bits, elemClass, a)
     }
 
-  /** Construct FixedHashSet implementation with given parameters
+  /** Construct FixedHashSet implementation with capacity (bits)
    *  and copy values from another set.
    */
   final def apply[T] (bits: Int, that: FixedHashSet[T]): FixedHashSet[T] = {
@@ -1192,11 +1135,11 @@ private final object FixedHashSet {
         new IntObjectHashSet (bits, that.elemClass, a)
       else
         new IntHashSet (bits, that.elemClass, a)
-    newSet.copyFrom (that, null, false)
+    newSet.rehash (that)
     newSet
   }
 
-  /** Create a new boxed array of new size with elements of another array.
+  /** Create a new boxed array and copy elements from another array.
    */
   final def resizeArray[T] (a: Array[T], newSize: Int): Array[T] = (
     a.asInstanceOf[Object] match {

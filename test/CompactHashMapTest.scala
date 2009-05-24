@@ -184,9 +184,28 @@ class CompactHashMapTest {
 
   @Test def testClone {
     val map = CompactHashMap[String,String]
+
+    // Empty map clone test
+    val emptyClone = map.clone
+    assertEquals(Nil, emptyClone.toList)
+    assertEquals(0, emptyClone.size)
+
     map("a") = "b"
     val mapClone = map.clone
+    assertTrue (mapClone.isInstanceOf[CompactHashMap[_,_]])
+
+    assertEquals(map.size, mapClone.size)
     map("a") = "x"
     assertEquals("b", mapClone("a"))
+    map.removeKey("a")
+    assertEquals("b", mapClone("a"))
+    mapClone("z") = "1"
+    map("q") = "2"
+    assertEquals("1", mapClone("z"))
+    assertEquals("2", map("q"))
+    assertFalse(mapClone.contains("q"))
+    assertFalse(map.contains("z"))
+
+    assertEquals(List("a" -> "b", "z" -> "1"), mapClone.toList)
   }
 }

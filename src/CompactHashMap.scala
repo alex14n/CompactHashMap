@@ -200,15 +200,12 @@ class CompactHashMap[K,V] (
       else value.asInstanceOf[Object].getClass
     ).asInstanceOf[Class[V]]
     //
-    if ((myValues ne null) && (myKeys.size == myValues.length)) {
+    if (myValues ne null) {
       myKeys = FixedHashSet (bits, myKeys)
       myValues = resizeArray (myValues, myKeys.capacity)
     } else {
-      val newKeys = FixedHashSet (bits, keyClass)
-      val newValues = newArray (valueClass, newKeys.capacity)
-      newKeys.copyFrom (myKeys, (i,j) => newValues(i) = myValues(j), true)
-      myKeys = newKeys
-      myValues = newValues
+      myKeys = FixedHashSet (bits, keyClass)
+      myValues = newArray (valueClass, myKeys.capacity)
     }
   }
 

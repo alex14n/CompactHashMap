@@ -1,13 +1,9 @@
-final class HashCached (final val i: Int) {
-  final override def hashCode = i
+final class Pos(final val x:Int, final val y:Int) {
+  final override def hashCode = x ^ (y << 16) ^ (y >>> 16)
   final override def equals (other: Any) = other match {
-    case that: HashCached => this.i == that.i
+    case that: Pos => this.x == that.x && this.y == that.y
     case _ => false
   }
-}
-
-final class Pos(private[this] val x:Int, private[this] val y:Int) {
-  final override def hashCode = x ^ y
 }
 
 object Benchmark {
@@ -23,9 +19,6 @@ object Benchmark {
 
   type T = String
   private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
-
-  type T = HashCached
-  private[this] val values = (0 to iterations*2).toList map { x => new HashCached(100000+x*123) } toArray
 
   type T = Int
   final def values(i: Int) = intKey(i)
@@ -194,10 +187,10 @@ object Benchmark {
     "compactWrite" -> {() => scalaWrite (new CompactHashMap)},
     "compactReadFull" -> scalaReadFull _,
     "compactReadEmpty" -> scalaReadEmpty _,
+/*
     "scalaWrite" -> {() => scalaWrite (new scala.collection.mutable.HashMap)},
     "scalaReadFull" -> scalaReadFull _,
     "scalaReadEmpty" -> scalaReadEmpty _,
-/*
     "fastutilWrite" -> {() => javaWrite(new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap)},
     "fastutilReadFull" -> javaReadFull _,
     "fastutilReadEmpty" -> javaReadEmpty _,
