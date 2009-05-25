@@ -9,14 +9,14 @@ final class Pos(final val x:Int, final val y:Int) {
 object Benchmark {
   private[this] val iterations = 0x180000
   final def intKey(i: Int) = i*123
-
+/*
   type T = Pos
   val rnd = new java.util.Random
   private[this] val values = (0 to iterations*2).toList map { x => new Pos(rnd.nextInt, rnd.nextInt) } toArray
-/*
+*/
   type T = Object
   private[this] val values = (0 to iterations*2).toList map { x => new Object } toArray
-
+/*
   type T = String
   private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
 
@@ -184,7 +184,7 @@ object Benchmark {
     "javaWrite" -> {() => javaWrite(new java.util.HashMap)},
     "javaReadFull" -> javaReadFull _,
     "javaReadEmpty" -> javaReadEmpty _,
-    "compactWrite" -> {() => scalaWrite (new CompactHashMap)},
+    "compactWrite" -> {() => scalaWrite (new CompactHashMap (classOf[T], classOf[T], 16, .75f))},
     "compactReadFull" -> scalaReadFull _,
     "compactReadEmpty" -> scalaReadEmpty _,
 /*

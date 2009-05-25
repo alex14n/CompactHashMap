@@ -46,7 +46,7 @@ class CompactHashSetTest {
   }
 
   @Test def testFixedDel {
-    val set = FixedHashSet (2, classOf[Int])
+    val set = FixedHashSet (2, classOf[Int], 1f)
     for (i <- 100000 to 100003) set add i
 
     assertEquals ( 0, set.positionOf(100000))
@@ -121,7 +121,7 @@ class CompactHashSetTest {
   }
 
   @Test def testFixedDel2 {
-    val set = FixedHashSet (2, classOf[Int])
+    val set = FixedHashSet (2, classOf[Int], 1f)
     for (i <- 0 to 3) set.add (i)
     set.clear
     for (i <- 11 to 14) set.add (i)
@@ -129,7 +129,7 @@ class CompactHashSetTest {
   }
 
   @Test def testFixedDel3 {
-    val set = FixedHashSet (2, classOf[Int])
+    val set = FixedHashSet (2, classOf[Int], 1f)
     for (i <- 1 to 4) set.add (i)
     for (i <- 4 until(0,-1)) set.delete (i)
     assertEquals (0, set.size)
@@ -145,7 +145,7 @@ class CompactHashSetTest {
   }
 
   @Test def testFilter {
-    val set = FixedHashSet (8, classOf[Int])
+    val set = FixedHashSet (8, classOf[Int], 1f)
     for (i <- 0 to 200) set add i
     val set1 = set.filter (
       new Filter[Int] {
@@ -159,7 +159,7 @@ class CompactHashSetTest {
 
   @Test def testClear {
     val elements = List ("1", "2", "test", "14", "0", null, "77")
-    val set = FixedHashSet (4, classOf[String])
+    val set = FixedHashSet (4, classOf[String], 1f)
     elements foreach { x => set addNew x }
     assertEquals (elements, set.toList)
     set.clear
@@ -189,5 +189,20 @@ class CompactHashSetTest {
 
     assertEquals(List("a", "b", "c"), setClone.toList)
     assertEquals(List("a", "d", "c"), set.toList)
+  }
+
+  @Test def testLoadFactor {
+    try {
+      CompactHashSet (classOf[String], 4, .1f)
+      fail
+    } catch {
+      case iea: IllegalArgumentException =>
+    }
+    try {
+      CompactHashSet (classOf[String], 4, 1.3f)
+      fail
+    } catch {
+      case iea: IllegalArgumentException =>
+    }
   }
 }

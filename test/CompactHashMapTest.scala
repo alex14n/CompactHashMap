@@ -212,7 +212,7 @@ class CompactHashMapTest {
   }
 
   @Test def testDelete {
-    val map = CompactHashMap (classOf[Int], classOf[Int], 20000)
+    val map = CompactHashMap (classOf[Int], classOf[Int], 20000, .75f)
     for (i <- 0 to 15) {
       for (j <- i*5000 until i*5000+8000) {
         assertFalse(map.containsInt(j<<5))
@@ -226,6 +226,8 @@ class CompactHashMapTest {
       }
       assertEquals(5000*(i+1), map.size)
     }
+    val keys = map.keySet.asInstanceOf[FixedHashSet[Int]]
+    assertEquals ((keys.hashLength * .75f).asInstanceOf[Int], keys.getArray.length)
   }
 
   @Test def testElements2 {

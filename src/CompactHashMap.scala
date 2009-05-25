@@ -38,6 +38,12 @@ object CompactHashMap {
   def apply[K,V] (keyClass: Class[K], valueClass: Class[V], capacity: Int) =
     new CompactHashMap (keyClass, valueClass, capacity)
 
+  /** Construct an empty map with given key and value classes,
+   *  initial capacity, and load factor.
+   */
+  def apply[K,V] (keyClass: Class[K], valueClass: Class[V], capacity: Int, loadFactor: Float) =
+    new CompactHashMap (keyClass, valueClass, capacity, loadFactor)
+
   /** Construct an empty map with given elements.
    */
   def apply[K,V] (elems: (K,V)*) =
@@ -69,7 +75,16 @@ class CompactHashMap[K,V] (
     this (keyClass, valueClass)
     var bits = initialBits
     while ((1 << bits) < capacity) bits += 1
-    resize (null.asInstanceOf[K], null.asInstanceOf[V], bits)
+    myKeys = FixedHashSet (bits, keyClass)
+    myValues = newArray (valueClass, myKeys.capacity)
+  }
+
+  def this (keyClass: Class[K], valueClass: Class[V], capacity: Int, loadFactor: Float) = {
+    this (keyClass, valueClass)
+    var bits = initialBits
+    while ((1 << bits) < capacity) bits += 1
+    myKeys = FixedHashSet (bits, keyClass, loadFactor)
+    myValues = newArray (valueClass, myKeys.capacity)
   }
 
   /** FixedHashSet with this map's keys.
@@ -205,7 +220,7 @@ class CompactHashMap[K,V] (
       myKeys = FixedHashSet (bits, myKeys)
       myValues = resizeArray (myValues, myKeys.capacity)
     } else {
-      myKeys = FixedHashSet (bits, keyClass)
+      myKeys = FixedHashSet (bits, keyClass, myKeys.loadFactor)
       myValues = newArray (valueClass, myKeys.capacity)
     }
   }
@@ -401,7 +416,7 @@ class CompactHashMap[K,V] (
     val newKeys = myKeys.filter (
       new Filter[K] {
         def check (key: K, i: Int) = p (key, myValues(i))
-        def create (bits: Int) { if (bits >= 0) newValues = newArray (valueClass, 1 << bits) }
+        def create (size: Int) { if (size > 0) newValues = newArray (valueClass, size) }
         def copy (i: Int, j: Int) { newValues(i) = myValues(j) }
       })
     new CompactHashMap (newKeys, newValues, valueClass)
@@ -418,7 +433,7 @@ class CompactHashMap[K,V] (
     val newKeys = myKeys.filter (
       new Filter[K] {
         def check (key: K, i: Int) = p (key, myValues(i))
-        def create (bits: Int) { if (bits >= 0) newValues = newArray (valueClass, 1 << bits) }
+        def create (size: Int) { if (size > 0) newValues = newArray (valueClass, size) }
         def copy (i: Int, j: Int) { newValues(i) = myValues(j) }
       })
     new CompactHashMap (newKeys, newValues, valueClass)
