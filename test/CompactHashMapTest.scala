@@ -1,3 +1,5 @@
+import FixedHashSet._
+
 import org.junit._
 import org.junit.Assert._
 

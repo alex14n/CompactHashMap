@@ -135,7 +135,12 @@ extends scala.collection.mutable.Set[T] {
    *  @return  the elements of this set satisfying <code>p</code>.
    */
   override def filter (p: T => Boolean) =
-    new CompactHashSet (fixedSet.filter ((e,i) => p(e), null, null))
+    new CompactHashSet (fixedSet.filter (
+      new Filter[T] {
+        def check (e:T, i:Int) = p(e)
+        def create (bits: Int) { }
+        def copy (i:Int, j:Int) { }
+      }))
 
   /** Removes all elements from the set.
    *  After this operation is completed, the set will be empty.
@@ -316,11 +321,7 @@ private abstract class FixedHashSet[T] (
    *  @param  copyCallback  function to call for each copied element
    *                    with its new and old indices in set's arrays.
    */
-  final def filter (
-    p: (T,Int) => Boolean,
-    newCallback: Int => Unit,
-    copyCallback: (Int,Int) => Unit
-  ) = {
+  final def filter (f: Filter[T]) = {
     // First, test all element with predicate,
     // count, and store test results in a bit set.
     val bitSet = new Array[Long] (1 max (arrayLength >>> 6))
@@ -328,7 +329,7 @@ private abstract class FixedHashSet[T] (
     var newBits = initialBits
     var i = 0
     while (i < firstEmptyIndex) {
-      if (!isEmpty(i) && p(array(i),i)) {
+      if (!isEmpty(i) && f.check(array(i),i)) {
         bitSet(i >>> 6) |= 1L << (i & 63)
         count += 1
         if (count > (1 << newBits)) newBits += 1
@@ -337,16 +338,16 @@ private abstract class FixedHashSet[T] (
     }
     // Now we can allocate set with exact size.
     if (count == 0) {
-      if (null ne newCallback) newCallback (-1)
+      f.create (-1)
       EmptyHashSet.asInstanceOf[FixedHashSet[T]]
     } else {
       val c = FixedHashSet (newBits, elemClass)
-      if (null ne newCallback) newCallback (newBits)
+      f.create (newBits)
       i = 0
       while (i < firstEmptyIndex) {
         if ((bitSet(i >>> 6) >>> (i & 63) & 1) != 0) {
           val i2 = c.addNew (array(i))
-          if (null ne copyCallback) copyCallback (i2, i)
+          f.copy (i2, i)
         }
         i += 1
       }
@@ -1166,4 +1167,12 @@ private final object FixedHashSet {
         a.copyToArray (newArray, 0)
         newArray
     }).asInstanceOf[Array[T]]
+
+  /** Filtering callbacks.
+   */
+  trait Filter[T] {
+    def check (key: T, index: Int): Boolean
+    def create (bits: Int): Unit
+    def copy (i: Int, j: Int): Unit
+  }
 }

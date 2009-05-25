@@ -1,3 +1,5 @@
+import FixedHashSet._
+
 import org.junit._
 import org.junit.Assert._
 
@@ -145,7 +147,12 @@ class CompactHashSetTest {
   @Test def testFilter {
     val set = FixedHashSet (8, classOf[Int])
     for (i <- 0 to 200) set add i
-    val set1 = set.filter ((x,i) => (x&3) == 0, null, null)
+    val set1 = set.filter (
+      new Filter[Int] {
+        def check (x: Int, i: Int) = (x&3) == 0
+        def create (bits: Int) { }
+        def copy (i: Int, j: Int) { }
+      })
     assertEquals (6, set1.bits)
     assertEquals ((0 until (201,4)).toList, set1.toList)
   }

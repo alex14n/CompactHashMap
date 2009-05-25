@@ -398,10 +398,28 @@ class CompactHashMap[K,V] (
   override def filter (p: ((K,V)) => Boolean) = {
     var newValues: Array[V] = null
     val newKeys = myKeys.filter (
-      (k,i) => p(k, myValues(i)),
-      bits => if (bits >= 0) newValues = newArray (valueClass, 1 << bits),
-      (i,j) => newValues(i) = myValues(j)
-    )
+      new Filter[K] {
+        def check (key: K, i: Int) = p (key, myValues(i))
+        def create (bits: Int) { if (bits >= 0) newValues = newArray (valueClass, 1 << bits) }
+        def copy (i: Int, j: Int) { newValues(i) = myValues(j) }
+      })
+    new CompactHashMap (newKeys, newValues, valueClass)
+  }
+
+  /** Returns a new map containing all elements of this map that
+   *  satisfy the predicate <code>p</code> (without Tuple2).
+   *
+   *  @param   p  the predicate used to filter the map.
+   *  @return  the elements of this map satisfying <code>p</code>.
+   */
+  def filter (p: (K,V) => Boolean) = {
+    var newValues: Array[V] = null
+    val newKeys = myKeys.filter (
+      new Filter[K] {
+        def check (key: K, i: Int) = p (key, myValues(i))
+        def create (bits: Int) { if (bits >= 0) newValues = newArray (valueClass, 1 << bits) }
+        def copy (i: Int, j: Int) { newValues(i) = myValues(j) }
+      })
     new CompactHashMap (newKeys, newValues, valueClass)
   }
 
