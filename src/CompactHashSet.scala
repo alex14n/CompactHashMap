@@ -64,7 +64,7 @@ extends scala.collection.mutable.Set[T] {
 
   /** Array to hold this set elements.
    */
-  private[this] var fixedSet = EmptyHashSet.asInstanceOf[FixedHashSet[T]]
+  private[this] var fixedSet = EMPTY_HASH_SET.asInstanceOf[FixedHashSet[T]]
 
   /** Check if this set contains element <code>elem</code>.
    *
@@ -187,6 +187,14 @@ private abstract class FixedHashSet[T] (
    */
   def hcBitmask: Int
 
+  /** End of list bit or 0 if it's not supported.
+   */
+  def eolBitmask = 0
+
+  /** Index value to mark the end of deleted list.
+   */
+  def deletedEOL = -1
+
   /** Return index of elem in array or -1 if it does not exists.
    */
   def positionOf[B >: T] (elem: B): Int
@@ -251,8 +259,10 @@ private abstract class FixedHashSet[T] (
     counter += 1
     if (firstDeletedIndex >= 0) {
       val i = firstDeletedIndex
-      firstDeletedIndex = nextIndex (firstDeletedIndex)
-      if (firstDeletedIndex < -2) firstDeletedIndex = -3-firstDeletedIndex
+      firstDeletedIndex = nextIndex (i)
+      if (firstDeletedIndex < -2 && firstDeletedIndex != deletedEOL)
+        firstDeletedIndex = -3-firstDeletedIndex
+      setNextIndex (i, -1)
       i
     } else {
       val i = firstEmptyIndex
@@ -290,8 +300,8 @@ private abstract class FixedHashSet[T] (
     getIndexArray match {
       case ia: Array[Int] =>
         val next = ia (i)
-        ia (i) = ~(newIndex | (hc & hcBitmask))
-        ia (arrayLength + newIndex) = if (next < 0) next else 1
+        ia (i) = ~(newIndex | (hc & hcBitmask) | (if (next < 0) 0 else INT_END_OF_LIST))
+        if (next < 0) ia (arrayLength + newIndex) = next
       case ia: Array[Short] =>
         val next = ia (i)
         ia (i) = (~newIndex ^ (hc & hcBitmask)).asInstanceOf[Short]
@@ -339,7 +349,7 @@ private abstract class FixedHashSet[T] (
     // Now we can allocate set with exact size.
     if (count == 0) {
       f.create (-1)
-      EmptyHashSet.asInstanceOf[FixedHashSet[T]]
+      EMPTY_HASH_SET.asInstanceOf[FixedHashSet[T]]
     } else {
       val c = FixedHashSet (newBits, elemClass)
       f.create (newBits)
@@ -372,10 +382,10 @@ private abstract class FixedHashSet[T] (
   /** Removes all elements from the set.
    */
   def clear {
-    var i = firstEmptyIndex
-    while (i > 0) {
-      i -= 1
+    var i = 0
+    while (i < firstEmptyIndex) {
       array(i) = null.asInstanceOf[T]
+      i += 1
     }
     counter = 0
     firstEmptyIndex = 0
@@ -387,48 +397,62 @@ private abstract class FixedHashSet[T] (
    * @return  index of deleted element in array
    *          or negative values if it was not present in set.
    */
-  final def delete (elem: T) = {
-    var h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
-    h = ((h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h) & (arrayLength - 1)
-    val i0 = firstIndex (h)
-    var i = i0
+  final def delete (elem: T): Int = {
+    val h = if (null eq elem.asInstanceOf[Object]) 0 else elem.hashCode
+    val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
+    //
+    val mask = hcBitmask
+    val hcBits = hc & mask
+    val eol = eolBitmask
+    //
     var prev = -1
-    while (i >= 0 && array(i & (arrayLength - 1)) != elem) {
-      prev = i & (arrayLength - 1)
-      i = nextIndex (prev)
-    }
-    if (i >= 0) {
-      i &= arrayLength - 1
-      counter -= 1
-      array(i) = null.asInstanceOf[T]
-
-      if (prev >= 0) setNextIndex (prev, nextIndex(i))
-      else setFirstIndex (h, nextIndex (i))
-
-      /* We are limited in index domain, e.g. for Byte:
-           0-127 = next element indices
-           -1 = empty (array default)
-           -2 = end of list
-           -128 to -3 = next empty (deleted) index
-         So we handle 2 last positions specially */
-      if (i == firstEmptyIndex-1) {
-        firstEmptyIndex = i
-        setNextIndex (i, -1)
-      } else {
-        if (firstDeletedIndex == arrayLength-2) {
-          // arrayLength-2 is out of NextIndex range
-          // and can only be pointed to with firstDeletedIndex,
-          // so we need to update next deleted list element
-          setNextIndex (i, nextIndex(firstDeletedIndex))
-          setNextIndex (firstDeletedIndex, -3-i)
-        } else {
-          val ni = if (firstDeletedIndex < 0) -1 else -3-firstDeletedIndex
-          setNextIndex (i, ni)
-          firstDeletedIndex = i
+    var curr = hc & (arrayLength - 1)
+    while (true) {
+      val i = firstIndex (curr)
+      if (i < 0) return -1
+      val j = i & (arrayLength - 1)
+      val k = arrayLength + j
+      //
+      if (hcBits == (i & mask)) {
+        val o = array(j)
+        if ((elem.asInstanceOf[Object] eq o.asInstanceOf[Object]) || elem == o) {
+          counter -= 1
+          array(j) = null.asInstanceOf[T]
+          //
+          if ((i & eol) == 0)
+            setFirstIndex (curr, firstIndex (k))
+          else if (prev >= 0)
+            setFirstIndex (prev, firstIndex(prev) ^ eol)
+          else
+            setFirstIndex (curr, -1)
+          /* We are limited in index domain, e.g. for Byte:
+               0-127 = next element indices
+               -1 = empty (array default)
+               -2 = end of list
+               -128 to -3 = next empty (deleted) index
+             So we handle 2 last positions specially */
+          if (j == firstEmptyIndex-1) {
+            firstEmptyIndex = j
+            setNextIndex (j, deletedEOL)
+          } else if (firstDeletedIndex == arrayLength-2) {
+            // arrayLength-2 is out of NextIndex range
+            // and can only be pointed to with firstDeletedIndex,
+            // so we need to update next deleted list element
+            setNextIndex (j, nextIndex(firstDeletedIndex))
+            setNextIndex (firstDeletedIndex, -3-j)
+          } else {
+            setNextIndex (j, if (firstDeletedIndex < 0) deletedEOL else -3-firstDeletedIndex)
+            firstDeletedIndex = j
+          }
+          return j
         }
       }
+      //
+      if ((i & eol) != 0) return -1
+      prev = curr
+      curr = k
     }
-    i
+    -1
   }
 
   /** Iterate through this set elements.
@@ -505,10 +529,12 @@ private final object FixedHashSet {
 
   final val initialBits = 2 // 4 elements
 
-  final val INT_NEXT_IS_EOL = 0x40000000;
-  final val INT_AVAILABLE_BITS = 0x3FFFFFFF;
-  final val SHORT_AVAILABLE_BITS = 0x7FFF;
-  final val BYTE_AVAILABLE_BITS = 0x7F;
+  final val INT_END_OF_LIST = 0x40000000
+  final val INT_AVAILABLE_BITS = 0x3FFFFFFF
+  final val SHORT_AVAILABLE_BITS = 0x7FFF
+  final val BYTE_AVAILABLE_BITS = 0x7F
+
+  final val EMPTY_HASH_SET = EmptyHashSet
 
   /** Create new array to hold set or map elements.
    */
@@ -803,6 +829,8 @@ private final object FixedHashSet {
       fill(indexTable, 0)
     }
     final def hcBitmask = INT_AVAILABLE_BITS ^ (len-1)
+    final override def eolBitmask = INT_END_OF_LIST
+    final override def deletedEOL = ~INT_END_OF_LIST
 
     // 'inline' some methods for better performance
 
@@ -824,11 +852,10 @@ private final object FixedHashSet {
           if ((x.asInstanceOf[Object] eq elem.asInstanceOf[Object]) || x == elem)
             return curr;
         }
-        if ((i & INT_NEXT_IS_EOL) != 0) return -1
+        if ((i & INT_END_OF_LIST) != 0) return -1
         curr += len
         i = ~indexTable(curr)
       }
-      if (prev >= 0) indexTable(prev) ^= INT_NEXT_IS_EOL;
       -1
     }
     final override def positionOfInt (elem: Int): Int = {
@@ -848,26 +875,21 @@ private final object FixedHashSet {
               val x = unboxedArray(curr)
               if (x == elem) return curr;
             }
-            if ((i & INT_NEXT_IS_EOL) != 0) return -1
+            if ((i & INT_END_OF_LIST) != 0) return -1
             curr += len
             i = ~indexTable(curr)
           }
-          if (prev >= 0) indexTable(prev) ^= INT_NEXT_IS_EOL;
           -1
         case _ => positionOf (elem)
       }
     }
-    final def isEmpty (i: Int) = {
-      val next = indexTable(len+i)
-      next == 0 || next > 1
-    }
+    final def isEmpty (i: Int) = indexTable(len+i) > 1
     final override def rehash (that: FixedHashSet[T]) {
       val array2 = that.getArray
       if (array2 eq null) return
       val size2 = array2.length
       var i = 0
       //
-      fill (indexTable, len, len+size2, 1)
       val mask = INT_AVAILABLE_BITS ^ (len-1)
       val mask2 = that.hcBitmask
       if ((mask2 & mask) == mask) {
@@ -881,12 +903,12 @@ private final object FixedHashSet {
             val hashIndex = i | (j & (mask ^ mask2))
             if (hashIndex == i) {
               if (next1 < 0) indexTable (len + arrayIndex) = next1
-              next1 = ~(arrayIndex | (j & mask) | (if (next1 < 0) 0 else INT_NEXT_IS_EOL))
+              next1 = ~(arrayIndex | (j & mask) | (if (next1 < 0) 0 else INT_END_OF_LIST))
             } else {
               if (next2 < 0) indexTable (len + arrayIndex) = next2
-              next2 = ~(arrayIndex | (j & mask) | (if (next2 < 0) 0 else INT_NEXT_IS_EOL))
+              next2 = ~(arrayIndex | (j & mask) | (if (next2 < 0) 0 else INT_END_OF_LIST))
             }
-            j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~index2(size2 + arrayIndex)
+            j = if ((j & INT_END_OF_LIST) != 0) -1 else ~index2(size2 + arrayIndex)
           }
           if (next1 < 0) indexTable (i) = next1
           if (next2 < 0) indexTable (i + size2) = next2
@@ -894,16 +916,16 @@ private final object FixedHashSet {
         }
       } else
         while (i < size2) {
-        val e = array2(i)
-        // inline addNew
-        val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
-        val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
-        val j = hc & (len - 1)
-        val next = indexTable(j)
-        indexTable (j) = ~(i | (hc & mask))
-        if (next < 0) indexTable (len+i) = next
-        i += 1
-      }
+          val e = array2(i)
+          // inline addNew
+          val h = if (null eq e.asInstanceOf[Object]) 0 else e.hashCode
+          val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
+          val j = hc & (len - 1)
+          val next = indexTable(j)
+          indexTable (j) = ~(i | (hc & mask) | (if (next < 0) 0 else INT_END_OF_LIST))
+          if (next < 0) indexTable (len+i) = next
+          i += 1
+        }
       setSize (size2)
     }
     final override def add (elem: T): Int = {
@@ -923,11 +945,11 @@ private final object FixedHashSet {
           if ((o.asInstanceOf[Object] eq elem.asInstanceOf[Object]) || o == elem)
             return k
         }
-        j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~indexTable (len+k)
+        j = if ((j & INT_END_OF_LIST) != 0) -1 else ~indexTable (len+k)
       }
       val newIndex = findEmptySpot
-      indexTable (i) = ~(newIndex | hcBits | (if (next < 0) 0 else INT_NEXT_IS_EOL))
-      indexTable (len + newIndex) = if (next < 0) next else 1
+      indexTable (i) = ~(newIndex | hcBits | (if (next < 0) 0 else INT_END_OF_LIST))
+      if (next < 0) indexTable (len + newIndex) = next
       localArray (newIndex) = elem
       newIndex
     }
@@ -949,11 +971,11 @@ private final object FixedHashSet {
               val o = unboxedArray (k)
               if (o == elem) return k
             }
-            j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~indexTable (len+k)
+            j = if ((j & INT_END_OF_LIST) != 0) -1 else ~indexTable (len+k)
           }
           val newIndex = findEmptySpot
-          indexTable (i) = ~(newIndex | hcBits | (if (next < 0) 0 else INT_NEXT_IS_EOL))
-          indexTable (len + newIndex) = if (next < 0) next else 1
+          indexTable (i) = ~(newIndex | hcBits | (if (next < 0) 0 else INT_END_OF_LIST))
+          if (next < 0) indexTable (len + newIndex) = next
           unboxedArray (newIndex) = elem
           newIndex
         case _ => add (elem.asInstanceOf[T])
@@ -985,6 +1007,8 @@ private final object FixedHashSet {
       fill(indexTable, 0)
     }
     final def hcBitmask = INT_AVAILABLE_BITS ^ (len-1)
+    final override def eolBitmask = INT_END_OF_LIST
+    final override def deletedEOL = ~INT_END_OF_LIST
 
     // 'inline' some methods for better performance
 
@@ -1006,24 +1030,19 @@ private final object FixedHashSet {
           if ((x eq elem.asInstanceOf[Object]) || (x ne null) && (x equals elem))
             return curr;
         }
-        if ((i & INT_NEXT_IS_EOL) != 0) return -1
+        if ((i & INT_END_OF_LIST) != 0) return -1
         curr += len
         i = ~indexTable(curr)
       }
-      if (prev >= 0) indexTable(prev) ^= INT_NEXT_IS_EOL;
       -1
     }
-    final def isEmpty (i: Int) = {
-      val next = indexTable(len+i)
-      next == 0 || next > 1
-    }
+    final def isEmpty (i: Int) = indexTable(len+i) > 1
     final override def rehash (that: FixedHashSet[T]) {
       val array2 = that.getArray
       if (array2 eq null) return
       val size2 = array2.length
       var i = 0
       //
-      fill (indexTable, len, len+size2, 1)
       val mask = INT_AVAILABLE_BITS ^ (len-1)
       val mask2 = that.hcBitmask
       if ((mask2 & mask) == mask) {
@@ -1037,18 +1056,18 @@ private final object FixedHashSet {
             val hashIndex = i | (j & (mask ^ mask2))
             if (hashIndex == i) {
               if (next1 < 0) indexTable (len + arrayIndex) = next1
-              next1 = ~(arrayIndex | (j & mask) | (if (next1 < 0) 0 else INT_NEXT_IS_EOL))
+              next1 = ~(arrayIndex | (j & mask) | (if (next1 < 0) 0 else INT_END_OF_LIST))
             } else {
               if (next2 < 0) indexTable (len + arrayIndex) = next2
-              next2 = ~(arrayIndex | (j & mask) | (if (next2 < 0) 0 else INT_NEXT_IS_EOL))
+              next2 = ~(arrayIndex | (j & mask) | (if (next2 < 0) 0 else INT_END_OF_LIST))
             }
-            j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~index2(size2 + arrayIndex)
+            j = if ((j & INT_END_OF_LIST) != 0) -1 else ~index2(size2 + arrayIndex)
           }
           if (next1 < 0) indexTable (i) = next1
           if (next2 < 0) indexTable (i + size2) = next2
           i += 1
         }
-      } else {
+      } else
         while (i < size2) {
           val e = array2(i)
           // inline addNew
@@ -1056,11 +1075,10 @@ private final object FixedHashSet {
           val hc = (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h
           val j = hc & (len - 1)
           val next = indexTable(j)
-          indexTable (j) = ~(i | (hc & mask))
+          indexTable (j) = ~(i | (hc & mask) | (if (next < 0) 0 else INT_END_OF_LIST))
           if (next < 0) indexTable (len+i) = next
           i += 1
         }
-      }
       setSize (size2)
     }
     final override def add (elem: T): Int = {
@@ -1080,11 +1098,11 @@ private final object FixedHashSet {
           if ((o eq elem.asInstanceOf[Object]) || ((o ne null) && (o equals elem)))
             return k
         }
-        j = if ((j & INT_NEXT_IS_EOL) != 0) -1 else ~indexTable (len+k)
+        j = if ((j & INT_END_OF_LIST) != 0) -1 else ~indexTable (len+k)
       }
       val newIndex = findEmptySpot
-      indexTable (i) = ~(newIndex | hcBits | (if (next < 0) 0 else INT_NEXT_IS_EOL))
-      indexTable (len + newIndex) = if (next < 0) next else 1
+      indexTable (i) = ~(newIndex | hcBits | (if (next < 0) 0 else INT_END_OF_LIST))
+      if (next < 0) indexTable (len + newIndex) = next
       localArray (newIndex) = elem.asInstanceOf[Object]
       newIndex
     }
@@ -1110,7 +1128,7 @@ private final object FixedHashSet {
    */
   final def apply[T] (bits: Int, elemClass: Class[T]): FixedHashSet[T] =
     if (bits <= 0 || (elemClass eq null))
-      EmptyHashSet.asInstanceOf[FixedHashSet[T]]
+      EMPTY_HASH_SET.asInstanceOf[FixedHashSet[T]]
     else {
       val a = newArray (elemClass, 1 << bits)
       if (bits <  8)

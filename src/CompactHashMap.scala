@@ -74,7 +74,7 @@ class CompactHashMap[K,V] (
 
   /** FixedHashSet with this map's keys.
    */
-  private[this] var myKeys = EmptyHashSet.asInstanceOf[FixedHashSet[K]]
+  private[this] var myKeys = EMPTY_HASH_SET.asInstanceOf[FixedHashSet[K]]
 
   /** Array with this map's values.
    */
@@ -178,10 +178,11 @@ class CompactHashMap[K,V] (
   override def clear {
     myKeys.clear
     if (myValues ne null) {
-      var i = myValues.length
-      while (i > 0) {
-        i -= 1
+      val len = myValues.length
+      var i = 0
+      while (i < len) {
         myValues(i) = null.asInstanceOf[V]
+        i += 1
       }
     }
   }

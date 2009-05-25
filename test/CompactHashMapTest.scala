@@ -210,4 +210,32 @@ class CompactHashMapTest {
 
     assertEquals(List("a" -> "b", "z" -> "1"), mapClone.toList)
   }
+
+  @Test def testDelete {
+    val map = CompactHashMap (classOf[Int], classOf[Int], 20000)
+    for (i <- 0 to 15) {
+      for (j <- i*5000 until i*5000+8000) {
+        assertFalse(map.containsInt(j<<5))
+        map.updateInt(j<<5, 123*j)
+      }
+      for (j <- (i+1)*5000 until (i+2)*5000) {
+        map -= j<<5
+      }
+      for (j <- 0 until (i+1)*5000) {
+        assertTrue(123*j == map.applyInt(j<<5))
+      }
+      assertEquals(5000*(i+1), map.size)
+    }
+  }
+
+  @Test def testElements2 {
+    val map = CompactHashMap (classOf[Int], classOf[Int], 40000)
+    map (100) = 200
+    val list = List(1 -> 14, 10 -> 100, 4 -> 44, 20 -> 200)
+    map ++= list
+    map -= 100
+    assertEquals (list, map.toList)
+    map (5) = 10
+    assertEquals (5->10 :: list, map.toList)
+  }
 }
