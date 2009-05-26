@@ -1165,13 +1165,14 @@ private final object FixedHashSet {
     if (bits <= 0 || (elemClass eq null))
       EMPTY_HASH_SET.asInstanceOf[FixedHashSet[T]]
     else {
-      val newLen = ((1 << bits) * loadFactor).asInstanceOf[Int]
-      if (newLen < 1 || newLen > (1 << bits))
+      val hashSize = 1 << bits
+      val dataSize = (hashSize * loadFactor).asInstanceOf[Int]
+      if (dataSize < 1 || dataSize > hashSize)
         throw new IllegalArgumentException ("Illegal load factor: " + loadFactor)
-      val a = newArray (elemClass, newLen)
-      if (bits <  8)
+      val a = newArray (elemClass, dataSize)
+      if (bits < 8 && dataSize == hashSize)
         new ByteHashSet (bits, elemClass, a, loadFactor) else
-      if (bits < 16)
+      if (bits < 16 && dataSize == hashSize)
         new ShortHashSet (bits, elemClass, a, loadFactor) else
       if (a.isInstanceOf[BoxedObjectArray])
         new IntObjectHashSet (bits, elemClass, a, loadFactor)
@@ -1183,13 +1184,14 @@ private final object FixedHashSet {
    *  and copy values from another set.
    */
   final def apply[T] (bits: Int, that: FixedHashSet[T]): FixedHashSet[T] = {
-    val newLen = ((1 << bits) * that.loadFactor).asInstanceOf[Int]
-    if (newLen < 1 || newLen > (1 << bits))
+    val hashSize = 1 << bits
+    val dataSize = (hashSize * that.loadFactor).asInstanceOf[Int]
+    if (dataSize < 1 || dataSize > hashSize)
       throw new IllegalArgumentException ("Illegal load factor: " + that.loadFactor)
-    val a = resizeArray (that.getArray, newLen)
-    val newSet = if (bits <  8)
+    val a = resizeArray (that.getArray, dataSize)
+    val newSet = if (bits < 8 && dataSize == hashSize)
         new ByteHashSet (bits, that.elemClass, a, that.loadFactor) else
-      if (bits < 16)
+      if (bits < 16 && dataSize == hashSize)
         new ShortHashSet (bits, that.elemClass, a, that.loadFactor) else
       if (a.isInstanceOf[BoxedObjectArray])
         new IntObjectHashSet (bits, that.elemClass, a, that.loadFactor)

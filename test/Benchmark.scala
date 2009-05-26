@@ -50,7 +50,7 @@ object Benchmark {
   }
 
   def compactIntWrite () {
-    compactMap = new CompactHashMap // (classOf[Int], classOf[Int], iterations)
+    compactMap = new CompactHashMap (classOf[T], classOf[T], 16, 0.75f)
     var i = 0
     while (i < iterations) {
       compactMap updateIntInt (intKey(i), intKey(2*iterations-i))
@@ -68,7 +68,7 @@ object Benchmark {
   }
 
   def troveIntWrite {
-    troveIntMap = new gnu.trove.TIntIntHashMap // (16, 0.4f)
+    troveIntMap = new gnu.trove.TIntIntHashMap (12, 0.5f)
     var i = 0
     while (i < iterations) {
       troveIntMap put (intKey(i), intKey(2*iterations-i))
@@ -77,7 +77,7 @@ object Benchmark {
   }
 
   def fastutilIntWrite {
-    fastutilIntMap = new it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap // (iterations, 0.5f)
+    fastutilIntMap = new it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap (24, 0.6f)
     var i = 0
     while (i < iterations) {
       fastutilIntMap put (intKey(i), intKey(2*iterations-i))
@@ -184,16 +184,13 @@ object Benchmark {
     "javaWrite" -> {() => javaWrite(new java.util.HashMap)},
     "javaReadFull" -> javaReadFull _,
     "javaReadEmpty" -> javaReadEmpty _,
-    "compactWrite" -> {() => scalaWrite (new CompactHashMap (classOf[T], classOf[T], 16, .75f))},
+    "compactWrite" -> {() => scalaWrite (new CompactHashMap (classOf[T], classOf[T], 16, 0.75f))},
     "compactReadFull" -> scalaReadFull _,
     "compactReadEmpty" -> scalaReadEmpty _,
-/*
     "scalaWrite" -> {() => scalaWrite (new scala.collection.mutable.HashMap)},
     "scalaReadFull" -> scalaReadFull _,
     "scalaReadEmpty" -> scalaReadEmpty _,
-    "fastutilWrite" -> {() => javaWrite(new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap)},
-    "fastutilReadFull" -> javaReadFull _,
-    "fastutilReadEmpty" -> javaReadEmpty _,
+/*
     "compactIntWrite" -> compactIntWrite _,
     "compactIntReadFull" -> compactIntReadFull _,
     "compactIntReadEmpty" -> compactIntReadEmpty _,
@@ -206,6 +203,9 @@ object Benchmark {
     "troveWrite" -> {() => javaWrite(new gnu.trove.THashMap)},
     "troveReadFull" -> javaReadFull _,
     "troveReadEmpty" -> javaReadEmpty _,
+    "fastutilWrite" -> {() => javaWrite(new it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap)},
+    "fastutilReadFull" -> javaReadFull _,
+    "fastutilReadEmpty" -> javaReadEmpty _,
 */
   )
 
