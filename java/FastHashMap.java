@@ -332,8 +332,8 @@ public class FastHashMap<K,V>
      *         previously associated <tt>null</tt> with <tt>key</tt>.)
      */
     public V remove(Object key) {
-      V result = removeKey(key);
-      return result == NOT_FOUND ? null : result;
+        V result = removeKey(key);
+        return result == NOT_FOUND ? null : result;
     }
 
     /**
@@ -349,7 +349,6 @@ public class FastHashMap<K,V>
      */
     final private V removeKey(Object key) {
         int hc = hash(key);
-        int h = hc & (hashLen-1);
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         int prev = -1;

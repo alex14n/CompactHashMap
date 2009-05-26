@@ -216,13 +216,13 @@ class CompactHashMapTest {
     for (i <- 0 to 15) {
       for (j <- i*5000 until i*5000+8000) {
         assertFalse(map.containsInt(j<<5))
-        map.updateInt(j<<5, 123*j)
+        map.updateIntInt(j<<5, 123*j)
       }
       for (j <- (i+1)*5000 until (i+2)*5000) {
         map -= j<<5
       }
       for (j <- 0 until (i+1)*5000) {
-        assertTrue(123*j == map.applyInt(j<<5))
+        assertTrue(123*j == map.applyIntInt(j<<5))
       }
       assertEquals(5000*(i+1), map.size)
     }
