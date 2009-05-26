@@ -1,0 +1,64 @@
+Some microbenchmark results:
+
+1.5 million new Objects, 32bit JVM:
+
+fastWrite            - 0.766s; Mem:  62.44 Mb
+fastReadFull         - 0.906s; Mem:  62.44 Mb
+fastReadEmpty        - 0.312s; Mem:  36.44 Mb
+compactWrite         - 0.843s; Mem:  64.43 Mb
+compactReadFull      - 1.000s; Mem:  64.43 Mb
+compactReadEmpty     - 0.312s; Mem:  36.43 Mb
+javaWrite            - 1.250s; Mem:  80.55 Mb
+javaReadFull         - 0.922s; Mem:  80.55 Mb
+javaReadEmpty        - 0.406s; Mem:  36.55 Mb
+scalaWrite           - 1.718s; Mem:  86.55 Mb
+scalaReadFull        - 1.234s; Mem:  86.59 Mb
+scalaReadEmpty       - 0.687s; Mem:  36.59 Mb
+
+1.5 million new Objects, 64bit JVM:
+
+fastWrite            - 0.313s; Mem: 110.94 Mb
+fastReadFull         - 0.302s; Mem: 110.94 Mb
+fastReadEmpty        - 0.143s; Mem:  72.94 Mb
+compactWrite         - 0.320s; Mem: 112.95 Mb
+compactReadFull      - 0.315s; Mem: 112.95 Mb
+compactReadEmpty     - 0.143s; Mem:  72.95 Mb
+javaWrite            - 0.532s; Mem: 161.28 Mb
+javaReadFull         - 0.313s; Mem: 161.28 Mb
+javaReadEmpty        - 0.257s; Mem:  73.28 Mb
+scalaWrite           - 0.786s; Mem: 149.24 Mb
+scalaReadFull        - 0.451s; Mem: 149.24 Mb
+scalaReadEmpty       - 0.436s; Mem:  73.24 Mb
+
+1.5 million Ints (=i*123), 32bit JVM:
+
+compactWrite         - 0.766s; Mem:  28.50 Mb
+compactReadFull      - 0.796s; Mem:  28.50 Mb
+compactReadEmpty     - 0.312s; Mem:   0.36 Mb
+compactIntWrite      - 0.656s; Mem:  28.41 Mb
+compactIntReadFull   - 0.453s; Mem:  28.41 Mb
+compactIntReadEmpty  - 0.203s; Mem:   0.34 Mb
+fastutilIntWrite     - 1.062s; Mem:  24.72 Mb
+fastutilIntReadFull  - 0.422s; Mem:  24.72 Mb
+fastutilIntReadEmpty - 0.406s; Mem:   0.34 Mb
+troveIntWrite        - 1.453s; Mem:  39.75 Mb
+troveIntReadFull     - 0.438s; Mem:  39.75 Mb
+troveIntReadEmpty    - 0.407s; Mem:   0.34 Mb
+fastWrite            - 1.406s; Mem:  76.94 Mb
+fastReadFull         - 0.844s; Mem:  76.94 Mb
+fastReadEmpty        - 0.250s; Mem:   0.59 Mb
+scalaWrite           - 4.906s; Mem:  96.65 Mb
+scalaReadFull        - 1.079s; Mem:  92.65 Mb
+scalaReadEmpty       - 0.734s; Mem:   0.66 Mb
+
+fast* is this FastHashMap.java with default (0.75) load factor
+compact* is this CompactHashMap.scala with 0.75 load factor
+compactInt* is this CompactHashMap.scala with Int accessors and 0.75 load factor
+java* is java.util.HashMap (jdk7b59)
+scala* is scala.collection.mutable.HashMap (2.7.4)
+fastutilInt* is Int2IntOpenHashMap (5.1.5) with 0.6 load factor, http://fastutil.dsi.unimi.it/
+troveInt* is TIntIntHashMap (2.0.4) with 0.5 load factor, http://trove4j.sourceforge.net/
+
+*Write is adding a new key/valus mapping
+*ReadFull is reading an existing key/valus mapping
+*ReadEmpty is looking for a non-existing key
