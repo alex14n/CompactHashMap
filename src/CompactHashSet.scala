@@ -541,12 +541,24 @@ private abstract class FixedHashSet[T] (
 import scala.runtime._
 import scala.runtime.ScalaRunTime.boxArray
 import scala.compat.Platform.createArray
-import java.util.Arrays.{fill, copyOf}
+import java.util.Arrays.fill
+import java.util.Arrays.copyOf // Comment this line on Java < 1.6
 
 /**
  */
 private final object FixedHashSet {
-
+/* UnComment these lines on Java < 1.6
+  import java.lang.System.arraycopy
+  final def copyOf (a: Array[Boolean], l: Int) = { val n = new Array[Boolean](l); arraycopy(a,0,n,0,a.length); n }
+  final def copyOf (a: Array[Char], l: Int) = { val n = new Array[Char](l); arraycopy(a,0,n,0,a.length); n }
+  final def copyOf (a: Array[Byte], l: Int) = { val n = new Array[Byte](l); arraycopy(a,0,n,0,a.length); n }
+  final def copyOf (a: Array[Short], l: Int) = { val n = new Array[Short](l); arraycopy(a,0,n,0,a.length); n }
+  final def copyOf (a: Array[Int], l: Int) = { val n = new Array[Int](l); arraycopy(a,0,n,0,a.length); n }
+  final def copyOf (a: Array[Long], l: Int) = { val n = new Array[Long](l); arraycopy(a,0,n,0,a.length); n }
+  final def copyOf (a: Array[Float], l: Int) = { val n = new Array[Float](l); arraycopy(a,0,n,0,a.length); n }
+  final def copyOf (a: Array[Double], l: Int) = { val n = new Array[Double](l); arraycopy(a,0,n,0,a.length); n }
+  final def copyOf (a: Array[Object], l: Int) = { val n = new Array[Object](l); arraycopy(a,0,n,0,a.length); n }
+*/
   final class ResizeNeeded extends Exception
 
   final val initialBits = 2 // 4 elements
