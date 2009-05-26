@@ -172,7 +172,7 @@ extends scala.collection.mutable.Set[T] {
 private abstract class FixedHashSet[T] (
   final val bits: Int,
   final val elemClass: Class[T],
-  a: Array[T],
+  private[this] var array: Array[T],
   final val loadFactor: Float
 ) extends scala.collection.Set[T] {
 
@@ -217,10 +217,6 @@ private abstract class FixedHashSet[T] (
   /** Return index of integer elem in array or -1 if it does not exists.
    */
   def positionOfInt (elem: Int) = positionOf (elem)
-
-  /** Array with this set elements.
-   */
-  private[this] var array = a
 
   /**
    */
