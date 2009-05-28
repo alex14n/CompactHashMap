@@ -227,6 +227,7 @@ public class FastHashMap<K,V>
      */
     final private int positionOf(Object key) {
         int hc = hash(key);
+        if (!bloomFilterCheck(hc)) return -1;
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         int prev = -1;
@@ -277,18 +278,20 @@ public class FastHashMap<K,V>
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         // Look if key is already in this map
-        int k;
-        for (int j = ~next; j >= 0; j = ~myIndices[hashLen+k]) {
-            k = j & (hashLen - 1);
-            if (hcBits == (j & mask)) {
-                Object o = myKeyValues[k<<1];
-                if (o == key || o != null && o.equals(key)) {
-                    Object oldValue = myKeyValues[(k<<1)+1];
-                    myKeyValues[(k<<1)+1] = value;
-                    return (V)oldValue;
+        if (bloomFilterCheck(hc)) {
+            int k;
+            for (int j = ~next; j >= 0; j = ~myIndices[hashLen+k]) {
+                k = j & (hashLen - 1);
+                if (hcBits == (j & mask)) {
+                    Object o = myKeyValues[k<<1];
+                    if (o == key || o != null && o.equals(key)) {
+                        Object oldValue = myKeyValues[(k<<1)+1];
+                        myKeyValues[(k<<1)+1] = value;
+                        return (V)oldValue;
+                    }
                 }
+                if ((j & END_OF_LIST) != 0) break;
             }
-            if ((j & END_OF_LIST) != 0) break;
         }
         // Resize if needed
         if (size >= threshold) {
@@ -319,6 +322,7 @@ public class FastHashMap<K,V>
         if (next < 0) myIndices[hashLen + newIndex] = next;
         myIndices[i] = ~(newIndex | hcBits | (next < 0 ? 0 : END_OF_LIST));
         size++;
+        bloomFilterAdd(hc);
         return null;
     }
 
@@ -746,4 +750,23 @@ public class FastHashMap<K,V>
             put(key, value); // ToDo: putNew
         }
     }
+
+    /**
+     * Bloom filter, http://en.wikipedia.org/wiki/Bloom_filter
+     */
+    transient private long bf1, bf2, bf3, bf4, bf5;
+    private final boolean bloomFilterCheck(int hc) {
+        return (bf1 & (1L <<  (hc        & 63))) != 0L &&
+               (bf2 & (1L << ((hc >>  6) & 63))) != 0L &&
+               (bf3 & (1L << ((hc >> 12) & 63))) != 0L &&
+               (bf4 & (1L << ((hc >> 18) & 63))) != 0L &&
+               (bf5 & (1L << ((hc >> 24) & 63))) != 0L;
+    }
+    private final void bloomFilterAdd(int hc) {
+        bf1 |= 1L <<  (hc        & 63);
+        bf2 |= 1L << ((hc >>  6) & 63);
+        bf3 |= 1L << ((hc >> 12) & 63);
+        bf4 |= 1L << ((hc >> 18) & 63);
+        bf5 |= 1L << ((hc >> 24) & 63);
+  }
 }
