@@ -60,5 +60,5 @@ fastutilInt* is Int2IntOpenHashMap (5.1.5) with 0.6 load factor, http://fastutil
 troveInt* is TIntIntHashMap (2.0.4) with 0.5 load factor, http://trove4j.sourceforge.net/
 
 *Write is adding a new key/value mapping
-*ReadFull is reading an existing key/valus mapping
+*ReadFull is reading an existing key/value mapping
 *ReadEmpty is looking for a non-existing key
