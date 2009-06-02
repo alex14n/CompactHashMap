@@ -1,3 +1,19 @@
+ * All data is stored in 2-3 arrays, no HashEntry objects => less memory, more GC friendly
+ * No dynamic memory allocation when adding a new key/value mapping (only during resize)
+ * Iteration over elements is a sequental array read => faster
+ * Adding a new key/value is a sequental array write => faster
+ * Preserves iteration order (if no keys were removed it's the same order they were inserted)
+ * HashCode bits are stored in index array => less random reads when looking for missing key
+ * (Scala only) Primitive types are stored in primitive arrays => saves a lot of memory
+
+
+If performance is more important than memory footprint you can modify:
+
+  final val DEFAULT_LOAD_FACTOR = .75f
+
+at the very end of CompactHashSet.scala file.
+
+
 Some microbenchmark results:
 
 1.5 million new Objects, 32bit JVM:
