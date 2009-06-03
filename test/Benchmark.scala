@@ -187,10 +187,13 @@ object Benchmark {
     "compactWrite" -> {() => scalaWrite (new CompactHashMap (classOf[T], classOf[T], 16, 0.75f))},
     "compactReadFull" -> scalaReadFull _,
     "compactReadEmpty" -> scalaReadEmpty _,
+    "javolutionWrite" -> {() => javaWrite(new javolution.util.FastMap)},
+    "javolutionReadFull" -> javaReadFull _,
+    "javolutionReadEmpty" -> javaReadEmpty _,
+/*
     "scalaWrite" -> {() => scalaWrite (new scala.collection.mutable.HashMap)},
     "scalaReadFull" -> scalaReadFull _,
     "scalaReadEmpty" -> scalaReadEmpty _,
-/*
     "compactIntWrite" -> compactIntWrite _,
     "compactIntReadFull" -> compactIntReadFull _,
     "compactIntReadEmpty" -> compactIntReadEmpty _,
