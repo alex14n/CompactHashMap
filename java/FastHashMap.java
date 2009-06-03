@@ -1,6 +1,5 @@
 import java.util.*;
 import java.io.*;
-import java.lang.reflect.Array;
 
 /**
  * Fast HashMap implementation.
@@ -229,10 +228,8 @@ public class FastHashMap<K,V>
         int hc = hash(key);
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
-        int prev = -1;
         int curr = hc & (hashLen-1);
         for (int i = ~myIndices[curr]; i >= 0; i = ~myIndices[curr]) {
-            prev = curr;
             curr = i & (hashLen-1);
             // Check if stored hashcode bits are equal
             // to hashcode of the key we are looking for
@@ -610,7 +607,7 @@ public class FastHashMap<K,V>
 
     private final class EntryIterator extends HashIterator<Map.Entry<K,V>> {
         protected Map.Entry<K,V> value() {
-            return new AbstractMap.SimpleEntry((K)lastKey, (V)lastValue);
+            return new AbstractMap.SimpleEntry<K,V>((K)lastKey, (V)lastValue);
         }
     }
 
