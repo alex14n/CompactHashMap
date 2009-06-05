@@ -5,8 +5,24 @@ public class FastLinkedHashMap<K,V>
 {
     private static final long serialVersionUID = 3801124242820219131L;
     private final boolean accessOrder;
+
+    /**
+     * Index array:
+     * it's even elements are 'before' indices
+     * (index of previous element in linked list),
+     * odd elements are 'after' (next element index).
+     */
     private transient int[] beforeAfter;
+
+    /**
+     * Index of the eldest map element, head of the linked list.
+     */
     private transient int headIndex;
+
+    /**
+     * Cached Entry of the eldest map element
+     * for removeEldestEntry speedup.
+     */
     private transient Map.Entry<K,V> headEntry;
 
     public FastLinkedHashMap(int initialCapacity, float loadFactor) {
@@ -64,6 +80,13 @@ public class FastLinkedHashMap<K,V>
         headEntry = null;
     }
 
+    /**
+     * This method is called before addition of new key/value pair.
+     *
+     * Here we check removeEldestEntry and remove map eldest pair
+     * if it returns true. Doing this check after addition can
+     * cause unnecessary resize.
+     */
     protected void beforeAdditionHook() {
         if(headIndex < 0) return;
         if(headEntry == null) {
@@ -71,27 +94,69 @@ public class FastLinkedHashMap<K,V>
             V value = (V)(keyShift > 0 ? myKeyValues[(headIndex<<keyShift)+1] : DUMMY_VALUE);
             headEntry = new AbstractMap.SimpleEntry<K,V>(key, value);
         }
-        if (removeEldestEntry(headEntry)) {
+        if(removeEldestEntry(headEntry)) {
             removeKey(headEntry.getKey());
         }
     }
 
+    /**
+     * This method is called after addition of new key/value pair.
+     *
+     * Here we insert its index to the very end of the linked list.
+     */
     protected void afterAdditionHook(int i) {
-        if (headIndex < 0) {
-            beforeAfter[i<<1] =
-            beforeAfter[(i<<1)+1] =
-            headIndex = i;
-        } else {
-            int last = beforeAfter[headIndex<<1];
-            beforeAfter[i<<1] = last;
-            beforeAfter[(i<<1)+1] = headIndex;
-            beforeAfter[headIndex<<1] = i;
-            beforeAfter[(last<<1)+1] = i;
-        }
-        modCount++;
+        insertIndex(i);
     }
 
+    /**
+     * This method is called when key/value pair is removed from the map.
+     *
+     * Here we remove its index from the linked list.
+     */
     protected void removeHook(int i) {
+        removeIndex(i);
+    }
+
+    /**
+     * This method is called when existing key's value is modified.
+     *
+     * Here we move its index to the end of linked list
+     * if accessOrder is true and update cached HeadEntry.
+     */
+    protected void updateHook(int i) {
+        updateIndex(i);
+        if(i == headIndex && headEntry != null) {
+            V value = (V)(keyShift > 0 ? myKeyValues[(headIndex<<keyShift)+1] : DUMMY_VALUE);
+            headEntry.setValue(value);
+        }
+    }
+
+    // Iteration order based on the linked list.
+
+    protected int iterateFirst() {
+        return headIndex;
+    }
+
+    protected int iterateNext(int i) {
+        i = beforeAfter[(i<<1)+1];
+        return i == headIndex ? -1 : i;
+    }
+
+    //
+
+    public V get(Object key) {
+        int i = positionOf(key);
+        if(i < 0) return null;
+        updateIndex(i);
+        return (V)(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE);
+    }
+
+    //
+
+    /**
+     * Remove index from the linked list.
+     */
+    private final void removeIndex(int i) {
         if (size == 0) {
             headIndex = -1;
             headEntry = null;
@@ -107,33 +172,36 @@ public class FastLinkedHashMap<K,V>
         }
     }
 
-    protected void updateHook(int i) {
+    /**
+     * Add index to the linked list.
+     *
+     * @param  i  index
+     */
+    private final void insertIndex(int i) {
+        if (headIndex < 0) {
+            beforeAfter[i<<1] =
+            beforeAfter[(i<<1)+1] =
+            headIndex = i;
+        } else {
+            int last = beforeAfter[headIndex<<1];
+            beforeAfter[i<<1] = last;
+            beforeAfter[(i<<1)+1] = headIndex;
+            beforeAfter[headIndex<<1] = i;
+            beforeAfter[(last<<1)+1] = i;
+        }
+        modCount++;
+    }
+
+    /**
+     * Move specified index to the end of the list
+     * if accessOrder is true.
+     *
+     * @param  i  index
+     */
+    private final void updateIndex(int i) {
         if(accessOrder) {
-            removeHook(i);
-            afterAdditionHook(i);
+            removeIndex(i);
+            insertIndex(i);
         }
-        if(i == headIndex && headEntry != null) {
-            V value = (V)(keyShift > 0 ? myKeyValues[(headIndex<<keyShift)+1] : DUMMY_VALUE);
-            headEntry.setValue(value);
-        }
-    }
-
-    protected int iterateFirst() {
-        return headIndex;
-    }
-
-    protected int iterateNext(int i) {
-        i = beforeAfter[(i<<1)+1];
-        return i == headIndex ? -1 : i;
-    }
-
-    public V get(Object key) {
-        int i = positionOf(key);
-        if(i < 0) return null;
-        if(accessOrder) {
-            removeHook(i);
-            afterAdditionHook(i);
-        }
-        return (V)(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE);
     }
 }

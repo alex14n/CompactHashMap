@@ -594,6 +594,12 @@ public class FastHashMap<K,V>
         return (ks != null ? ks : (keySet = new KeySet()));
     }
 
+    /**
+     * This method defines this map iteration order.
+     * This order can be changed in subclasses like LinkedHashMap.
+     *
+     * @return  index of the first element.
+     */
     protected int iterateFirst() {
         if (size == 0) return -1;
         int i = 0;
@@ -601,11 +607,22 @@ public class FastHashMap<K,V>
         return i;
     }
 
+    /**
+     * This method defines this map iteration order.
+     * This order can be changed in subclasses like LinkedHashMap.
+     *
+     * @param  i  index if the current element.
+     * @return  index of the next element.
+     */
     protected int iterateNext(int i) {
         do i++; while (i < firstEmptyIndex && isEmpty(i));
         return i < firstEmptyIndex ? i : -1;
     }
 
+    /**
+     * Generic iterator over this map.
+     * value() method should return the real elements.
+     */
     private abstract class HashIterator<E> implements Iterator<E> {
         protected int i = iterateFirst();
         protected Object lastKey = NOT_FOUND;
@@ -623,6 +640,8 @@ public class FastHashMap<K,V>
             lastKey = myKeyValues[i<<keyShift];
             lastValue = keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE;
             i = iterateNext(i);
+            // Do not iterate over elements that were added
+            // after this iterator was created.
             if (i >= maxIndex) i = -1;
             return value();
         }
