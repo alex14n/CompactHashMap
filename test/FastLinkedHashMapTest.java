@@ -75,4 +75,19 @@ public class FastLinkedHashMapTest {
     assertEquals("1", map2.lastValue);
   }
 
+  class EldestNullRemovingMap extends FastLinkedHashMap<String,String> {
+    protected boolean removeEldestEntry(Map.Entry<String,String> eldest) {
+      return eldest.getKey() == null;
+    }
+  }
+  @Test public void test1 () {
+    EldestNullRemovingMap map = new EldestNullRemovingMap();
+    map.put("1", "x");
+    map.put(null, "y");
+    map.remove("1");
+    map.put("", "z");
+    assertEquals(1, map.size());
+    assertFalse(map.containsKey(null));
+  }
+
 }

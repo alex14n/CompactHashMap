@@ -346,14 +346,18 @@ public class FastHashMap<K,V>
             if ((j & END_OF_LIST) != 0) break;
         }
         //
+        int mc = modCount;
         beforeAdditionHook();
         // Resize if needed
         if (size >= threshold) {
             resize();
             i = hc & (hashLen - 1);
-            next = myIndices[i];
             mask = AVAILABLE_BITS ^ (hashLen-1);
             hcBits = hc & mask;
+            mc--;
+        }
+        if(mc != modCount) {
+          next = myIndices[i];
         }
         // Find a place for new element
         int newIndex;
