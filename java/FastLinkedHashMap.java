@@ -50,6 +50,7 @@ public class FastLinkedHashMap<K,V>
     public FastLinkedHashMap<K,V> clone() {
         FastLinkedHashMap<K,V> that = (FastLinkedHashMap<K,V>)super.clone();
         that.beforeAfter = beforeAfter.clone();
+        that.headEntry = null;
         return that;
     }
 
