@@ -811,11 +811,9 @@ public class FastHashMap<K,V>
         s.writeInt(size);
 
         // Write out keys and values (alternating)
-        for (int i = 0; i < firstEmptyIndex; i++) {
-            if (!isEmpty(i)) {
-                s.writeObject(myKeyValues[i<<keyShift]);
-                s.writeObject(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : null);
-            }
+        for (int i = iterateFirst(); i >= 0; i = iterateNext(i)) {
+            s.writeObject(myKeyValues[i<<keyShift]);
+            s.writeObject(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : null);
         }
     }
 
