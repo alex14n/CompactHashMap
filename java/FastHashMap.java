@@ -77,6 +77,17 @@ public class FastHashMap<K,V>
     transient private Object[] myKeyValues;
 
     /**
+     * 1 if myKeyValues contains keys and values,
+     * 0 if only keys (to save memory in HashSet).
+     */
+    transient private int keyShift;
+
+    /**
+     * Value to use if keyShift is 0.
+     */
+    final static Object DUMMY_VALUE = new Object();
+
+    /**
      * Array of complex indices.
      *
      * First <tt>hashLen</tt> are hashcode-to-array maps,
@@ -131,10 +142,14 @@ public class FastHashMap<K,V>
      * (16) and the default load factor (0.75).
      */
     public FastHashMap() {
+       this(true);
+    }
+    FastHashMap(boolean withValues) {
         loadFactor = DEFAULT_LOAD_FACTOR;
         hashLen = DEFAULT_INITIAL_CAPACITY;
         threshold = (int)(hashLen * loadFactor);
-        myKeyValues = new Object[threshold<<1];
+        keyShift = withValues ? 1 : 0;
+        myKeyValues = new Object[threshold<<keyShift];
         myIndices = new int[hashLen+threshold];
     }
 
@@ -148,23 +163,26 @@ public class FastHashMap<K,V>
      *         or the load factor is greater than one or is too low
      */
     public FastHashMap(int initialCapacity, float loadFactor) {
+        this(initialCapacity, loadFactor, true);
+    }
+    FastHashMap(int initialCapacity, float loadFactor, boolean withValues) {
         if (initialCapacity < 0)
             throw new IllegalArgumentException(
                 "Illegal initial capacity: " + initialCapacity);
         if (initialCapacity > MAXIMUM_CAPACITY)
             initialCapacity = MAXIMUM_CAPACITY;
-        if (loadFactor > MAXIMUM_LOAD_FACTOR ||
-            Float.isNaN(loadFactor))
+        if (Float.isNaN(loadFactor))
             throw new IllegalArgumentException(
                 "Illegal load factor: " + loadFactor);
-        this.loadFactor = loadFactor;
+        this.loadFactor = loadFactor > MAXIMUM_LOAD_FACTOR ? MAXIMUM_LOAD_FACTOR : loadFactor;
         // Find a power of 2 >= initialCapacity
         for (hashLen = DEFAULT_INITIAL_CAPACITY; hashLen < initialCapacity; hashLen <<= 1);
         threshold = (int)(hashLen * loadFactor);
         if (threshold < 1)
             throw new IllegalArgumentException(
                 "Illegal load factor: " + loadFactor);
-        myKeyValues = new Object[threshold<<1];
+        keyShift = withValues ? 1 : 0;
+        myKeyValues = new Object[threshold<<keyShift];
         myIndices = new int[hashLen+threshold];
     }
 
@@ -176,7 +194,10 @@ public class FastHashMap<K,V>
      * @throws IllegalArgumentException if the initial capacity is negative.
      */
     public FastHashMap(int initialCapacity) {
-        this(initialCapacity, DEFAULT_LOAD_FACTOR);
+        this(initialCapacity, DEFAULT_LOAD_FACTOR, true);
+    }
+    FastHashMap(int initialCapacity, boolean withValues) {
+        this(initialCapacity, DEFAULT_LOAD_FACTOR, withValues);
     }
 
     /**
@@ -185,7 +206,7 @@ public class FastHashMap<K,V>
     final private void resize() {
         int newHashLen = hashLen << 1;
         int newValueLen = (int)(newHashLen * loadFactor);
-        Object[] newKeyValues = Arrays.copyOf(myKeyValues,newValueLen<<1);
+        Object[] newKeyValues = Arrays.copyOf(myKeyValues,newValueLen<<keyShift);
         int[] newIndices = new int[newHashLen+newValueLen];
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int newMask = AVAILABLE_BITS ^ (newHashLen-1);
@@ -234,7 +255,7 @@ public class FastHashMap<K,V>
             // Check if stored hashcode bits are equal
             // to hashcode of the key we are looking for
             if (hcBits == (i & mask)) {
-                Object x = myKeyValues[curr<<1];
+                Object x = myKeyValues[curr<<keyShift];
                 if (x == key || x != null && x.equals(key))
                     return curr;
             }
@@ -278,10 +299,10 @@ public class FastHashMap<K,V>
         for (int j = ~next; j >= 0; j = ~myIndices[hashLen+k]) {
             k = j & (hashLen - 1);
             if (hcBits == (j & mask)) {
-                Object o = myKeyValues[k<<1];
+                Object o = myKeyValues[k<<keyShift];
                 if (o == key || o != null && o.equals(key)) {
-                    Object oldValue = myKeyValues[(k<<1)+1];
-                    myKeyValues[(k<<1)+1] = value;
+                    Object oldValue = keyShift > 0 ? myKeyValues[(k<<keyShift)+1] : DUMMY_VALUE;
+                    if (keyShift > 0) myKeyValues[(k<<keyShift)+1] = value;
                     return (V)oldValue;
                 }
             }
@@ -311,8 +332,8 @@ public class FastHashMap<K,V>
             firstEmptyIndex++;
         }
         // Insert it
-        myKeyValues[newIndex<<1] = key;
-        myKeyValues[(newIndex<<1)+1] = value;
+        myKeyValues[newIndex<<keyShift] = key;
+        if (keyShift > 0) myKeyValues[(newIndex<<keyShift)+1] = value;
         if (next < 0) myIndices[hashLen + newIndex] = next;
         myIndices[i] = ~(newIndex | hcBits | (next < 0 ? 0 : END_OF_LIST));
         size++;
@@ -336,7 +357,7 @@ public class FastHashMap<K,V>
     /**
      * Value to distinguish null as 'key not found' from null as real value.
      */
-    private static Object NOT_FOUND = new Object();
+    private final static Object NOT_FOUND = new Object();
 
     /**
      * Removes the mapping for the specified key from this map if present.
@@ -354,7 +375,7 @@ public class FastHashMap<K,V>
             int j = i & (hashLen-1);
             int k = hashLen + j;
             if (hcBits == (i & mask)) {
-                Object o = myKeyValues[j<<1];
+                Object o = myKeyValues[j<<keyShift];
                 if (o == key || o != null && o.equals(key)) {
                     size--;
                     if((i & END_OF_LIST) != 0) {
@@ -371,9 +392,9 @@ public class FastHashMap<K,V>
                         myIndices[k] = firstDeletedIndex < 0 ? END_OF_LIST : firstDeletedIndex+1;
                         firstDeletedIndex = j;
                     }
-                    Object oldValue = myKeyValues[(j<<1)+1];
-                    myKeyValues[j<<1] = null;
-                    myKeyValues[(j<<1)+1] = null;
+                    Object oldValue = keyShift > 0 ? myKeyValues[(j<<keyShift)+1] : DUMMY_VALUE;
+                    myKeyValues[j<<keyShift] = null;
+                    if (keyShift > 0) myKeyValues[(j<<keyShift)+1] = null;
                     return (V)oldValue;
                 }
             }
@@ -389,7 +410,7 @@ public class FastHashMap<K,V>
      * The map will be empty after this call returns.
      */
     public void clear() {
-        Arrays.fill(myKeyValues, 0, firstEmptyIndex<<1, null);
+        Arrays.fill(myKeyValues, 0, firstEmptyIndex<<keyShift, null);
         Arrays.fill(myIndices, 0, hashLen + firstEmptyIndex, 0);
         size = 0;
         firstEmptyIndex = 0;
@@ -453,7 +474,7 @@ public class FastHashMap<K,V>
      */
     public V get(Object key) {
         int i = positionOf(key);
-        return i >= 0 ? (V)myKeyValues[(i<<1)+1] : null;
+        return i < 0 ? null : (V)(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE);
     }
 
     /**
@@ -491,9 +512,10 @@ public class FastHashMap<K,V>
      *         specified value
      */
     public boolean containsValue(Object value) {
+        if (keyShift == 0) return size > 0 && value == DUMMY_VALUE;
         for (int i = 0; i < firstEmptyIndex ; i++)
             if (!isEmpty(i)) { // Not deleted
-                Object o = myKeyValues[(i<<1)+1];
+                Object o = myKeyValues[(i<<keyShift)+1];
                 if (o == value || o != null && o.equals(value))
                     return true;
             }
@@ -538,8 +560,8 @@ public class FastHashMap<K,V>
         public final E next() {
             while (i < firstEmptyIndex && isEmpty(i)) i++;
             if (i < firstEmptyIndex) {
-                lastKey = myKeyValues[i<<1];
-                lastValue = myKeyValues[(i<<1)+1];
+                lastKey = myKeyValues[i<<keyShift];
+                lastValue = keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE;
                 i++;
                 return value();
             }
@@ -621,7 +643,7 @@ public class FastHashMap<K,V>
             Map.Entry<K,V> e = (Map.Entry<K,V>) o;
             int i = positionOf(e.getKey());
             if (i < 0) return false;
-            Object v1 = myKeyValues[(i<<1)+1];
+            Object v1 = keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE;
             Object v2 = e.getValue();
             return v1 == v2 || v1 != null && v1.equals(v2);
         }
@@ -709,8 +731,8 @@ public class FastHashMap<K,V>
         // Write out keys and values (alternating)
         for (int i = 0; i < firstEmptyIndex; i++) {
             if (!isEmpty(i)) {
-                s.writeObject(myKeyValues[i<<1]);
-                s.writeObject(myKeyValues[(i<<1)+1]);
+                s.writeObject(myKeyValues[i<<keyShift]);
+                s.writeObject(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : null);
             }
         }
     }
@@ -729,7 +751,8 @@ public class FastHashMap<K,V>
 
         // Read in number of buckets and allocate the bucket array;
         hashLen = s.readInt();
-        myKeyValues = new Object[threshold<<1];
+        keyShift = 1;
+        myKeyValues = new Object[threshold<<keyShift];
         myIndices = new int[hashLen+threshold];
         firstDeletedIndex = -1;
 
@@ -743,4 +766,8 @@ public class FastHashMap<K,V>
             put(key, value); // ToDo: putNew
         }
     }
+
+    // These methods are used when serializing HashSets
+    int   capacity()     { return hashLen; }
+    float loadFactor()   { return loadFactor;   }
 }
