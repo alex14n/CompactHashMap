@@ -3,6 +3,7 @@ import org.junit.*;
 import static org.junit.Assert.*;
 
 public class FastLinkedHashMapTest {
+
   @Test public void test () {
     FastLinkedHashMap<String,String> map = new FastLinkedHashMap<String,String> (16, .75f, true);
 
@@ -46,4 +47,32 @@ public class FastLinkedHashMapTest {
     assertEquals("4", i.next());
     assertFalse(i.hasNext());
   }
+
+  class HeadEntryTester extends FastLinkedHashMap<String,String> {
+    String lastValue = null;
+    protected boolean removeEldestEntry(Map.Entry<String,String> eldest) {
+      lastValue = eldest.getValue();
+      return false;
+    }
+    public HeadEntryTester clone() {
+      HeadEntryTester that = (HeadEntryTester)super.clone();
+      that.lastValue = null;
+      return that;
+  }
+  }
+
+  @Test public void testHeadEntry () {
+    HeadEntryTester map1 = new HeadEntryTester();
+    assertEquals(null, map1.lastValue);
+    map1.put("a", "1");
+    map1.put("b", "x");
+    assertEquals("1", map1.lastValue);
+    HeadEntryTester map2 = map1.clone();
+    map1.put("a", "2");
+    map1.put("c", "+");
+    assertEquals("2", map1.lastValue);
+    map2.put("c", "-");
+    assertEquals("1", map2.lastValue);
+  }
+
 }
