@@ -84,7 +84,7 @@ public class FastHashSet<E>
         s.writeInt(map.size());
 
         // Write out all elements in the proper order.
-        for (Iterator i=map.keySet().iterator(); i.hasNext(); )
+        for (Iterator<E> i=map.keySet().iterator(); i.hasNext(); )
             s.writeObject(i.next());
     }
 
@@ -96,9 +96,9 @@ public class FastHashSet<E>
         // Read in HashMap capacity and load factor and create backing HashMap
         int capacity = s.readInt();
         float loadFactor = s.readFloat();
-        map =  (((FastHashSet)this) instanceof FastLinkedHashSet ?
+        map =  this instanceof FastLinkedHashSet ?
                new FastLinkedHashMap<E,Object>(capacity, loadFactor) :
-               new FastHashMap<E,Object>(capacity, loadFactor, false));
+               new FastHashMap<E,Object>(capacity, loadFactor, false);
 
         // Read in size
         int size = s.readInt();

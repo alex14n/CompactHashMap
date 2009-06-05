@@ -1,5 +1,4 @@
 import java.util.*;
-import java.io.*;
 import org.junit.*;
 import static org.junit.Assert.*;
 
@@ -31,7 +30,7 @@ public class FastHashSetTest {
     assertEquals("1", i.next());
     assertEquals(null, i.next());
 
-    // This is not structural modifications:
+    // This is not structural modification:
     set.add("4");
 
     // Continue
