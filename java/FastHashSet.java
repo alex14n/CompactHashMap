@@ -14,7 +14,10 @@ public class FastHashSet<E>
     }
 
     public FastHashSet(Collection<? extends E> c) {
-        map = new FastHashMap<E,Object>(Math.max((int) (c.size()/.75f) + 1, 16), false);
+        map = new FastHashMap<E,Object>(
+            Math.max((int)(c.size()/FastHashMap.DEFAULT_LOAD_FACTOR) + 1,
+                     FastHashMap.DEFAULT_INITIAL_CAPACITY),
+            false);
         addAll(c);
     }
 
@@ -25,11 +28,11 @@ public class FastHashSet<E>
     public FastHashSet(int initialCapacity) {
         map = new FastHashMap<E,Object>(initialCapacity, false);
     }
-/*
+
     FastHashSet(int initialCapacity, float loadFactor, boolean dummy) {
         map = new FastLinkedHashMap<E,Object>(initialCapacity, loadFactor, false);
     }
-*/
+
     public Iterator<E> iterator() {
         return map.keySet().iterator();
     }
@@ -93,9 +96,9 @@ public class FastHashSet<E>
         // Read in HashMap capacity and load factor and create backing HashMap
         int capacity = s.readInt();
         float loadFactor = s.readFloat();
-        map = // (((FastHashSet)this) instanceof FastLinkedHashSet ?
-              // new FastLinkedHashMap<E,Object>(capacity, loadFactor) :
-               new FastHashMap<E,Object>(capacity, loadFactor, false);
+        map =  (((FastHashSet)this) instanceof FastLinkedHashSet ?
+               new FastLinkedHashMap<E,Object>(capacity, loadFactor) :
+               new FastHashMap<E,Object>(capacity, loadFactor, false));
 
         // Read in size
         int size = s.readInt();

@@ -31,10 +31,11 @@ public class FastHashSetTest {
     assertEquals("1", i.next());
     assertEquals(null, i.next());
 
-    // These are not structural modifications:
+    // This is not structural modifications:
     set.add("4");
-    set.remove("2");
 
+    // Continue
+    assertEquals("2", i.next());
     assertEquals("3", i.next());
     assertFalse(i.hasNext());
 

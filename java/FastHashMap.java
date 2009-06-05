@@ -67,20 +67,20 @@ public class FastHashMap<K,V>
     /**
      * The number of key-value mappings contained in this map.
      */
-    transient private int size = 0;
+    transient protected int size = 0;
 
     /**
      * Arrays with stored keys and values.
      * Storing them in one array in neighbour cells
      * is faster since it's reading adjacent memory addresses.
      */
-    transient private Object[] myKeyValues;
+    transient protected Object[] myKeyValues;
 
     /**
      * 1 if myKeyValues contains keys and values,
      * 0 if only keys (to save memory in HashSet).
      */
-    transient private int keyShift;
+    transient protected int keyShift;
 
     /**
      * Value to use if keyShift is 0.
@@ -112,7 +112,7 @@ public class FastHashMap<K,V>
      * Index of the first not occupied position in array.
      * All elements starting with this index are free.
      */
-    transient private int firstEmptyIndex = 0;
+    transient protected int firstEmptyIndex = 0;
 
     /**
      * Index of first element in deleted list,
@@ -129,7 +129,7 @@ public class FastHashMap<K,V>
      * The next size value at which to resize (capacity * load factor).
      * @serial
      */
-    private int threshold;
+    protected int threshold;
 
     /**
      * The load factor for the hash table.
@@ -160,6 +160,7 @@ public class FastHashMap<K,V>
         keyShift = withValues ? 1 : 0;
         myKeyValues = new Object[threshold<<keyShift];
         myIndices = new int[hashLen+threshold];
+        init();
     }
 
     /**
@@ -193,6 +194,7 @@ public class FastHashMap<K,V>
         keyShift = withValues ? 1 : 0;
         myKeyValues = new Object[threshold<<keyShift];
         myIndices = new int[hashLen+threshold];
+        init();
     }
 
     /**
@@ -225,9 +227,19 @@ public class FastHashMap<K,V>
     }
 
     /**
+     * Initialization hook for subclasses. This method is called
+     * in all constructors and pseudo-constructors (clone, readObject)
+     * after HashMap has been initialized but before any entries have
+     * been inserted.  (In the absence of this method, readObject would
+     * require explicit knowledge of subclasses.)
+     */
+    protected void init() {
+    }
+
+    /**
      * Increase size of internal arrays two times.
      */
-    final private void resize() {
+    protected void resize() {
         int newHashLen = hashLen << 1;
         int newValueLen = (int)(newHashLen * loadFactor);
         Object[] newKeyValues = Arrays.copyOf(myKeyValues,newValueLen<<keyShift);
@@ -327,11 +339,14 @@ public class FastHashMap<K,V>
                 if (o == key || o != null && o.equals(key)) {
                     Object oldValue = keyShift > 0 ? myKeyValues[(k<<keyShift)+1] : DUMMY_VALUE;
                     if (keyShift > 0) myKeyValues[(k<<keyShift)+1] = value;
+                    accessHook(k);
                     return (V)oldValue;
                 }
             }
             if ((j & END_OF_LIST) != 0) break;
         }
+        //
+        beforeAdditionHook();
         // Resize if needed
         if (size >= threshold) {
             resize();
@@ -362,7 +377,23 @@ public class FastHashMap<K,V>
         if (next < 0) myIndices[hashLen + newIndex] = next;
         myIndices[i] = ~(newIndex | hcBits | (next < 0 ? 0 : END_OF_LIST));
         size++;
+        afterAdditionHook(newIndex);
         return null;
+    }
+
+    /**
+     */
+    protected void beforeAdditionHook() {
+    }
+
+    /**
+     */
+    protected void afterAdditionHook(int i) {
+    }
+
+    /**
+     */
+    protected void accessHook(int i) {
     }
 
     /**
@@ -390,7 +421,7 @@ public class FastHashMap<K,V>
      * @param key key whose mapping is to be removed from the map
      * @return NOT_FOUND or old value
      */
-    final private V removeKey(Object key) {
+    final protected V removeKey(Object key) {
         int hc = hash(key);
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
@@ -420,6 +451,8 @@ public class FastHashMap<K,V>
                     Object oldValue = keyShift > 0 ? myKeyValues[(j<<keyShift)+1] : DUMMY_VALUE;
                     myKeyValues[j<<keyShift] = null;
                     if (keyShift > 0) myKeyValues[(j<<keyShift)+1] = null;
+                    modCount++;
+                    removeHook(j);
                     return (V)oldValue;
                 }
             }
@@ -428,6 +461,11 @@ public class FastHashMap<K,V>
             curr = k;
         }
         return (V)NOT_FOUND;
+    }
+
+    /**
+     */
+    protected void removeHook(int i) {
     }
 
     /**
@@ -501,7 +539,9 @@ public class FastHashMap<K,V>
      */
     public V get(Object key) {
         int i = positionOf(key);
-        return i < 0 ? null : (V)(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE);
+        if(i < 0) return null;
+        accessHook(i);
+        return (V)(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE);
     }
 
     /**
@@ -576,34 +616,47 @@ public class FastHashMap<K,V>
         return (ks != null ? ks : (keySet = new KeySet()));
     }
 
+    protected int iterateFirst() {
+        if (size == 0) return -1;
+        int i = 0;
+        while(isEmpty(i)) i++;
+        return i;
+    }
+
+    protected int iterateNext(int i) {
+        do i++; while (i < firstEmptyIndex && isEmpty(i));
+        return i < firstEmptyIndex ? i : -1;
+    }
+
     private abstract class HashIterator<E> implements Iterator<E> {
-        protected int i = 0;
+        protected int i = iterateFirst();
         protected Object lastKey = NOT_FOUND;
         protected Object lastValue = NOT_FOUND;
         int expectedModCount = modCount; // For fast-fail
         int maxIndex = firstEmptyIndex;
         public final boolean hasNext() {
-            while (i < maxIndex && isEmpty(i)) i++;
-            return i < maxIndex;
+            return i >= 0;
         }
         public final E next() {
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
-            while (i < maxIndex && isEmpty(i)) i++;
-            if (i < maxIndex) {
-                lastKey = myKeyValues[i<<keyShift];
-                lastValue = keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE;
-                i++;
-                return value();
-            }
-            else throw new NoSuchElementException();
+            if (i < 0)
+                throw new NoSuchElementException();
+            lastKey = myKeyValues[i<<keyShift];
+            lastValue = keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE;
+            i = iterateNext(i);
+            if (i >= maxIndex) i = -1;
+            return value();
         }
         public final void remove() {
             if (lastKey == NOT_FOUND)
                 throw new IllegalStateException();
+            if (modCount != expectedModCount)
+                throw new ConcurrentModificationException();
             removeKey(lastKey);
             lastKey = NOT_FOUND;
             lastValue = NOT_FOUND;
+            expectedModCount = modCount;
         }
         protected abstract E value();
     }
@@ -784,6 +837,8 @@ public class FastHashMap<K,V>
         myKeyValues = new Object[threshold<<keyShift];
         myIndices = new int[hashLen+threshold];
         firstDeletedIndex = -1;
+
+        init();  // Give subclass a chance to do its thing.
 
         // Read in size (number of Mappings)
         int size = s.readInt();
