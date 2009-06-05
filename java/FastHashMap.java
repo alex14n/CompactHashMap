@@ -138,6 +138,15 @@ public class FastHashMap<K,V>
     final float loadFactor;
 
     /**
+     * The number of times this HashMap has been structurally modified
+     * Structural modifications are those that change the number of mappings in
+     * the HashMap or otherwise modify its internal structure (e.g.,
+     * rehash).  This field is used to make iterators on Collection-views of
+     * the HashMap fail-fast.  (See ConcurrentModificationException).
+     */
+    transient int modCount;
+
+    /**
      * Constructs an empty <tt>HashMap</tt> with the default initial capacity
      * (16) and the default load factor (0.75).
      */
@@ -198,6 +207,21 @@ public class FastHashMap<K,V>
     }
     FastHashMap(int initialCapacity, boolean withValues) {
         this(initialCapacity, DEFAULT_LOAD_FACTOR, withValues);
+    }
+
+    /**
+     * Constructs a new <tt>HashMap</tt> with the same mappings as the
+     * specified <tt>Map</tt>.  The <tt>HashMap</tt> is created with
+     * default load factor (0.75) and an initial capacity sufficient to
+     * hold the mappings in the specified <tt>Map</tt>.
+     *
+     * @param   m the map whose mappings are to be placed in this map
+     * @throws  NullPointerException if the specified map is null
+     */
+    public FastHashMap(Map<? extends K, ? extends V> m) {
+        this(Math.max((int) (m.size() / DEFAULT_LOAD_FACTOR) + 1,
+                      DEFAULT_INITIAL_CAPACITY), DEFAULT_LOAD_FACTOR);
+        putAll(m); // ToDo: putAllNew
     }
 
     /**
@@ -327,6 +351,7 @@ public class FastHashMap<K,V>
             else
                 firstDeletedIndex = di-1;
             if (next >= 0) myIndices[hashLen+newIndex] = 0;
+            modCount++;
         } else {
             newIndex = firstEmptyIndex;
             firstEmptyIndex++;
@@ -415,6 +440,7 @@ public class FastHashMap<K,V>
         size = 0;
         firstEmptyIndex = 0;
         firstDeletedIndex = -1;
+        modCount++;
     }
 
     /**
@@ -434,6 +460,7 @@ public class FastHashMap<K,V>
         that.keySet = null;
         that.values = null;
         that.entrySet = null;
+        that.modCount = 0;
         return that;
     }
 
@@ -553,13 +580,17 @@ public class FastHashMap<K,V>
         protected int i = 0;
         protected Object lastKey = NOT_FOUND;
         protected Object lastValue = NOT_FOUND;
+        int expectedModCount = modCount; // For fast-fail
+        int maxIndex = firstEmptyIndex;
         public final boolean hasNext() {
-            while (i < firstEmptyIndex && isEmpty(i)) i++;
-            return i < firstEmptyIndex;
+            while (i < maxIndex && isEmpty(i)) i++;
+            return i < maxIndex;
         }
         public final E next() {
-            while (i < firstEmptyIndex && isEmpty(i)) i++;
-            if (i < firstEmptyIndex) {
+            if (modCount != expectedModCount)
+                throw new ConcurrentModificationException();
+            while (i < maxIndex && isEmpty(i)) i++;
+            if (i < maxIndex) {
                 lastKey = myKeyValues[i<<keyShift];
                 lastValue = keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE;
                 i++;
@@ -570,11 +601,9 @@ public class FastHashMap<K,V>
         public final void remove() {
             if (lastKey == NOT_FOUND)
                 throw new IllegalStateException();
-            else {
-                removeKey(lastKey);
-                lastKey = NOT_FOUND;
-                lastValue = NOT_FOUND;
-            }
+            removeKey(lastKey);
+            lastKey = NOT_FOUND;
+            lastValue = NOT_FOUND;
         }
         protected abstract E value();
     }
@@ -769,5 +798,5 @@ public class FastHashMap<K,V>
 
     // These methods are used when serializing HashSets
     int   capacity()     { return hashLen; }
-    float loadFactor()   { return loadFactor;   }
+    float loadFactor()   { return loadFactor; }
 }

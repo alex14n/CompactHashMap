@@ -30,9 +30,38 @@ public class FastHashSetTest {
     Iterator<String> i = set.iterator();
     assertEquals("1", i.next());
     assertEquals(null, i.next());
-    assertEquals("2", i.next());
+
+    // These are not structural modifications:
+    set.add("4");
+    set.remove("2");
+
     assertEquals("3", i.next());
     assertFalse(i.hasNext());
+
+    // Check removal
+    assertTrue(set.remove("1"));
+    assertFalse(set.remove("1"));
+    assertFalse(set.contains("1"));
   }
 
+  @Test(expected=ConcurrentModificationException.class)
+  public void testIterator () {
+    FastHashSet<String> set = new FastHashSet<String> ();
+    set.add("1");
+    set.add("2");
+    set.add("3");
+    set.add("4");
+    set.add("5");
+    Iterator<String> i = set.iterator();
+    assertEquals("1", i.next());
+    assertEquals("2", i.next());
+    set.remove("2");
+    set.remove("4");
+    assertEquals("3", i.next());
+    set.add("2");
+    set.add("4");
+    assertEquals("2", i.next()); // This is bad: "2" iterated twice
+    assertEquals("5", i.next());
+    assertFalse(i.hasNext());
+  }
 }
