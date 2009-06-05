@@ -281,7 +281,7 @@ public class FastHashMap<K,V>
      * @param key key
      * @return index of key in array or -1 if it was not found
      */
-    final private int positionOf(Object key) {
+    final protected int positionOf(Object key) {
         int hc = hash(key);
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
@@ -339,7 +339,7 @@ public class FastHashMap<K,V>
                 if (o == key || o != null && o.equals(key)) {
                     Object oldValue = keyShift > 0 ? myKeyValues[(k<<keyShift)+1] : DUMMY_VALUE;
                     if (keyShift > 0) myKeyValues[(k<<keyShift)+1] = value;
-                    accessHook(k);
+                    updateHook(k);
                     return (V)oldValue;
                 }
             }
@@ -379,21 +379,6 @@ public class FastHashMap<K,V>
         size++;
         afterAdditionHook(newIndex);
         return null;
-    }
-
-    /**
-     */
-    protected void beforeAdditionHook() {
-    }
-
-    /**
-     */
-    protected void afterAdditionHook(int i) {
-    }
-
-    /**
-     */
-    protected void accessHook(int i) {
     }
 
     /**
@@ -461,11 +446,6 @@ public class FastHashMap<K,V>
             curr = k;
         }
         return (V)NOT_FOUND;
-    }
-
-    /**
-     */
-    protected void removeHook(int i) {
     }
 
     /**
@@ -539,9 +519,7 @@ public class FastHashMap<K,V>
      */
     public V get(Object key) {
         int i = positionOf(key);
-        if(i < 0) return null;
-        accessHook(i);
-        return (V)(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE);
+        return i < 0 ? null : (V)(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE);
     }
 
     /**
@@ -852,4 +830,10 @@ public class FastHashMap<K,V>
     // These methods are used when serializing HashSets
     int   capacity()     { return hashLen; }
     float loadFactor()   { return loadFactor; }
+
+    // These hooks are needed for LinkedHashMap
+    protected void beforeAdditionHook() { }
+    protected void afterAdditionHook(int i) { }
+    protected void updateHook(int i) { }
+    protected void removeHook(int i) { }
 }

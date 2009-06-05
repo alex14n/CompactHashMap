@@ -5,8 +5,9 @@ public class FastLinkedHashMap<K,V>
 {
     private static final long serialVersionUID = 3801124242820219131L;
     private final boolean accessOrder;
-    transient private int[] beforeAfter;
+    private transient int[] beforeAfter;
     private transient int headIndex;
+    private transient Map.Entry<K,V> headEntry;
 
     public FastLinkedHashMap(int initialCapacity, float loadFactor) {
         super(initialCapacity, loadFactor);
@@ -36,9 +37,9 @@ public class FastLinkedHashMap<K,V>
     }
 
     public void clear() {
-        // Arrays.fill(beforeAfter, 0, firstEmptyIndex<<1, 0);
         super.clear();
         headIndex = -1;
+        headEntry = null;
     }
 
     protected void resize() {
@@ -57,18 +58,20 @@ public class FastLinkedHashMap<K,V>
     }
 
     protected void init() {
-        // super.init();
         beforeAfter = new int[threshold<<1];
         headIndex = -1;
+        headEntry = null;
     }
 
     protected void beforeAdditionHook() {
-        if(headIndex >= 0) {
+        if(headIndex < 0) return;
+        if(headEntry == null) {
             K key = (K)myKeyValues[headIndex<<keyShift];
             V value = (V)(keyShift > 0 ? myKeyValues[(headIndex<<keyShift)+1] : DUMMY_VALUE);
-            Map.Entry<K,V> eldest = new AbstractMap.SimpleEntry<K,V>(key, value); // ToDo: cache it?
-            if (removeEldestEntry(eldest))
-                removeKey(key);
+            headEntry = new AbstractMap.SimpleEntry<K,V>(key, value);
+        }
+        if (removeEldestEntry(headEntry)) {
+            removeKey(headEntry.getKey());
         }
     }
 
@@ -90,19 +93,27 @@ public class FastLinkedHashMap<K,V>
     protected void removeHook(int i) {
         if (size == 0) {
             headIndex = -1;
+            headEntry = null;
         } else {
             int prev = beforeAfter[i<<1];
             int next = beforeAfter[(i<<1)+1];
             beforeAfter[next<<1] = prev;
             beforeAfter[(prev<<1)+1] = next;
-            if(headIndex == i) headIndex = next;
+            if(headIndex == i) {
+                headIndex = next;
+                headEntry = null;
+            }
         }
     }
 
-    protected void accessHook(int i) {
+    protected void updateHook(int i) {
         if(accessOrder) {
             removeHook(i);
             afterAdditionHook(i);
+        }
+        if(i == headIndex && headEntry != null) {
+            V value = (V)(keyShift > 0 ? myKeyValues[(headIndex<<keyShift)+1] : DUMMY_VALUE);
+            headEntry.setValue(value);
         }
     }
 
@@ -113,5 +124,15 @@ public class FastLinkedHashMap<K,V>
     protected int iterateNext(int i) {
         i = beforeAfter[(i<<1)+1];
         return i == headIndex ? -1 : i;
+    }
+
+    public V get(Object key) {
+        int i = positionOf(key);
+        if(i < 0) return null;
+        if(accessOrder) {
+            removeHook(i);
+            afterAdditionHook(i);
+        }
+        return (V)(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE);
     }
 }
