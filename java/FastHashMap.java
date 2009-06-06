@@ -234,13 +234,13 @@ public class FastHashMap<K,V>
      * been inserted.  (In the absence of this method, readObject would
      * require explicit knowledge of subclasses.)
      */
-    protected void init() {
+    void init() {
     }
 
     /**
      * Increase size of internal arrays two times.
      */
-    protected void resize() {
+    void resize() {
         int newHashLen = hashLen << 1;
         int newValueLen = (int)(newHashLen * loadFactor);
         Object[] newKeyValues = Arrays.copyOf(myKeyValues,newValueLen<<keyShift);
@@ -282,7 +282,7 @@ public class FastHashMap<K,V>
      * @param key key
      * @return index of key in array or -1 if it was not found
      */
-    final protected int positionOf(Object key) {
+    final int positionOf(Object key) {
         int hc = hash(key);
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
@@ -411,7 +411,7 @@ public class FastHashMap<K,V>
      * @param key key whose mapping is to be removed from the map
      * @return NOT_FOUND or old value
      */
-    final protected V removeKey(Object key) {
+    final V removeKey(Object key) {
         int hc = hash(key);
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
@@ -605,7 +605,7 @@ public class FastHashMap<K,V>
      *
      * @return  index of the first element.
      */
-    protected int iterateFirst() {
+    int iterateFirst() {
         if (size == 0) return -1;
         int i = 0;
         while(isEmpty(i)) i++;
@@ -619,7 +619,7 @@ public class FastHashMap<K,V>
      * @param  i  index if the current element.
      * @return  index of the next element.
      */
-    protected int iterateNext(int i) {
+    int iterateNext(int i) {
         do i++; while (i < firstEmptyIndex && isEmpty(i));
         return i < firstEmptyIndex ? i : -1;
     }
@@ -629,8 +629,8 @@ public class FastHashMap<K,V>
      * value() method should return the real elements.
      */
     private abstract class HashIterator<E> implements Iterator<E> {
-        protected int nextIndex = iterateFirst();
-        protected int lastIndex = -1;
+        int nextIndex = iterateFirst();
+        int lastIndex = -1;
         int expectedModCount = modCount; // For fast-fail
         public final boolean hasNext() {
             return nextIndex >= 0;
@@ -653,11 +653,11 @@ public class FastHashMap<K,V>
             lastIndex = -1;
             expectedModCount = modCount;
         }
-        protected abstract E value();
+        abstract E value();
     }
 
     private final class KeyIterator extends HashIterator<K> {
-        protected K value() {
+        K value() {
             return (K)myKeyValues[lastIndex<<keyShift];
         }
     }
@@ -705,7 +705,7 @@ public class FastHashMap<K,V>
     }
 
     private final class EntryIterator extends HashIterator<Map.Entry<K,V>> {
-        protected Map.Entry<K,V> value() {
+        Map.Entry<K,V> value() {
             return new Entry(lastIndex);
         }
     }
@@ -759,7 +759,7 @@ public class FastHashMap<K,V>
     }
 
     private final class ValueIterator extends HashIterator<V> {
-        protected V value() {
+        V value() {
             return (V)(keyShift > 0 ? myKeyValues[(lastIndex<<keyShift)+1] : DUMMY_VALUE);
         }
     }

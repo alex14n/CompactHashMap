@@ -66,7 +66,7 @@ public class FastLinkedHashMap<K,V>
         headEntry = null;
     }
 
-    protected void resize() {
+    void resize() {
         super.resize();
         beforeAfter = Arrays.copyOf(beforeAfter, threshold<<1);
     }
@@ -82,7 +82,7 @@ public class FastLinkedHashMap<K,V>
         return false;
     }
 
-    protected void init() {
+    void init() {
         beforeAfter = new int[threshold<<1];
         headIndex = -1;
         headEntry = null;
@@ -96,7 +96,7 @@ public class FastLinkedHashMap<K,V>
      * if it returns true. Doing this check after addition can
      * cause unnecessary resize.
      */
-    protected void addHook(int i) {
+    void addHook(int i) {
         insertIndex(i);
         //
         if(headIndex < 0) return;
@@ -113,7 +113,7 @@ public class FastLinkedHashMap<K,V>
      *
      * Here we remove its index from the linked list.
      */
-    protected void removeHook(int i) {
+    void removeHook(int i) {
         removeIndex(i);
     }
 
@@ -123,17 +123,17 @@ public class FastLinkedHashMap<K,V>
      * Here we move its index to the end of linked list
      * if accessOrder is true and update cached HeadEntry.
      */
-    protected void updateHook(int i) {
+    void updateHook(int i) {
         updateIndex(i);
     }
 
     // Iteration order based on the linked list.
 
-    protected int iterateFirst() {
+    int iterateFirst() {
         return headIndex;
     }
 
-    protected int iterateNext(int i) {
+    int iterateNext(int i) {
         i = beforeAfter[(i<<1)+1];
         return i == headIndex ? -1 : i;
     }
