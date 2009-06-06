@@ -14,7 +14,10 @@ public class FastLinkedHashSetTest {
     int method = rnd.nextInt(3);
     switch(method) {
       case 0: clone = ((FastLinkedHashSet<Integer>)s).clone(); break;
-      case 1: clone = new FastLinkedHashSet(Arrays.asList(s.toArray())); break;
+      case 1:
+        @SuppressWarnings("unchecked")
+        List<Integer> list = (List)Arrays.asList(s.toArray());
+        clone = new FastLinkedHashSet<Integer>(list); break;
       default: clone = serClone(s); break;
     }
     assertEquals(s, clone);
