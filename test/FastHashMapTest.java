@@ -251,4 +251,184 @@ public class FastHashMapTest {
     assertEquals("x", map.get("a"));
   }
 
+  // jdk tests for HashMap
+
+  @Test public void testKeySetRemove () {
+    FastHashMap<String,String> map = new FastHashMap<String,String> ();
+    map.put("bananas", null);
+    assertTrue(map.keySet().remove("bananas"));
+  }
+
+  @Test public void testSetValue () {
+    String key      = "key";
+    String oldValue = "old";
+    String newValue = "new";
+    FastHashMap<String,String> m = new FastHashMap<String,String> ();
+    m.put(key, oldValue);
+    Map.Entry<String,String> e = (Map.Entry<String,String>) m.entrySet().iterator().next();
+    Object returnVal = e.setValue(newValue);
+    assertEquals(oldValue, returnVal);
+  }
+
+  @Test public void testToString () {
+    FastHashMap<String,String> m = new FastHashMap<String,String> ();
+    m.put(null, null);
+    m.entrySet().iterator().next().toString();
+  }
+
+  // jdk Hashtable tests
+
+  @Test public void testHashCode () {
+    FastHashMap<String,String> m = new FastHashMap<String,String> ();
+    assertEquals(0, m.hashCode());
+    m.put("Joe", "Blow");
+    assertEquals("Joe".hashCode() ^ "Blow".hashCode(), m.hashCode());
+  }
+
+  @Test(expected=IllegalArgumentException.class)
+  public void testIllegalLoadFactor1 () {
+    new FastHashMap<String,String> (100, -3);
+  }
+
+  @Test(expected=IllegalArgumentException.class)
+  public void testIllegalLoadFactor2 () {
+    new FastHashMap<String,String> (100, Float.NaN);
+  }
+
+  @Test public void testIllegalLoadFactor3 () {
+    new FastHashMap<String,String> (100, .69f);
+  }
+
+  static class ReadObject extends FastHashMap {
+    class ValueWrapper implements Serializable {
+      private Object mValue;
+      ValueWrapper(Object value) {
+        mValue = value;
+      }
+      Object getValue() {
+        return mValue;
+      }
+    };
+
+    public Object get(Object key) {
+      ValueWrapper valueWrapper = (ValueWrapper)super.get(key);
+      Object value = valueWrapper.getValue();
+      if(value instanceof ValueWrapper)
+        throw new RuntimeException("Hashtable.get bug");
+      return value;
+    }
+
+    public Object put(Object key, Object value) {
+      if(value instanceof ValueWrapper)
+        throw new RuntimeException(
+            "Hashtable.put bug: value is already wrapped");
+      ValueWrapper valueWrapper = new ValueWrapper(value);
+      super.put(key, valueWrapper);
+      return value;
+    }
+  }
+
+  private static Object copyObject(Object oldObj) {
+    Object newObj = null;
+    try {
+      //Create a stream in which to serialize the object.
+      ByteArrayOutputStream ostream = new ByteArrayOutputStream();
+      ObjectOutputStream p = new ObjectOutputStream(ostream);
+      //Serialize the object into the stream
+      p.writeObject(oldObj);
+
+      //Create an input stream from which to deserialize the object
+      byte[] byteArray = ostream.toByteArray();
+      ByteArrayInputStream istream = new ByteArrayInputStream(byteArray);
+      ObjectInputStream q = new ObjectInputStream(istream);
+      //Deserialize the object
+      newObj = q.readObject();
+    } catch (Exception ex) {
+      ex.printStackTrace();
+    }
+    return newObj;
+  }
+
+  @Test public void testReadObject () {
+    ReadObject myHashtable = new ReadObject();
+    myHashtable.put("key", "value");
+    ReadObject myHashtableCopy = (ReadObject)copyObject(myHashtable);
+    myHashtableCopy.get("key");
+  }
+
+  private static void testMap(Map<Object,Object> m) {
+    assertEquals("{}", m.toString());
+    m.put("Harvey", m);
+    assertEquals("{Harvey=(this Map)}", m.toString());
+    m.clear();
+    m.put(m, "Harvey");
+    assertEquals("{(this Map)=Harvey}", m.toString());
+    m.clear();
+    m.hashCode();
+  }
+
+  @Test public void testSelfRef () {
+    testMap(new FastHashMap<Object,Object>());
+    testMap(new FastLinkedHashMap<Object,Object>());
+  }
+
+  // put(..., false) test
+
+  @Test public void testCopyConstructor () {
+    FastHashMap<String,String> map = new FastHashMap<String,String> ();
+    map.put("1", "a");
+    map.put("", "c");
+    map.put("2", "b");
+    map.put(null, "d");
+    map.put("3", "e");
+    FastHashMap<String,String> copy = new FastHashMap<String,String> (map);
+    assertEquals(map.size(), copy.size());
+    assertEquals(map, copy);
+  }
+
+  // jdk test
+
+  @Test(expected=ConcurrentModificationException.class)
+  public void testEmptyMapIterator () {
+    Map map = new FastHashMap();
+    Iterator iter = iter = map.entrySet().iterator();
+    map.put("key", "value");
+    iter.next();
+  }
+
+  // jdk IdentityHashMap tests
+
+  @Test public void testToArray1 () {
+    FastHashMap<String,String> mm = new FastHashMap<String,String>();
+    mm.put("foo", "bar");
+    mm.put("baz", "quux");
+    List<Map.Entry<String,String>> lm
+        = new ArrayList<Map.Entry<String,String>>(mm.entrySet());
+    String s = lm.toString();
+    assertEquals("[foo=bar, baz=quux]", s);
+  }
+
+  @Test public void testToArray2 () {
+    Map m = new FastHashMap();
+    m.put("french", "connection");
+    m.put("polish", "sausage");
+    Object[] mArray = m.entrySet().toArray();
+    assertFalse(mArray[0] == mArray[1]);
+    assertEquals("french=connection", mArray[0].toString());
+    assertEquals("polish=sausage", mArray[1].toString());
+  }
+
+  @Test public void testToArray3 () {
+    FastHashMap<Integer,Integer> map = new FastHashMap<Integer,Integer>();
+    Set<Map.Entry<Integer,Integer>> es = map.entrySet();
+    assertEquals(0, es.toArray().length);
+    assertEquals(null, es.toArray(new Object[]{Boolean.TRUE})[0]);
+    map.put(7,49);
+    assertEquals(1, es.toArray().length);
+    Object[] x = es.toArray(new Object[]{Boolean.TRUE, Boolean.TRUE});
+    assertEquals(null, x[1]);
+    Map.Entry e = (Map.Entry) x[0];
+    assertEquals(new Integer(7), e.getKey());
+    assertEquals(new Integer(49), e.getValue());
+  }
 }

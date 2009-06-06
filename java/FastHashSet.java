@@ -30,7 +30,7 @@ public class FastHashSet<E>
     }
 
     FastHashSet(int initialCapacity, float loadFactor, boolean dummy) {
-        map = new FastLinkedHashMap<E,Object>(initialCapacity, loadFactor, false);
+        map = new FastLinkedHashMap<E,Object>(initialCapacity, loadFactor, false, false);
     }
 
     public Iterator<E> iterator() {
@@ -97,7 +97,7 @@ public class FastHashSet<E>
         int capacity = s.readInt();
         float loadFactor = s.readFloat();
         map =  this instanceof FastLinkedHashSet ?
-               new FastLinkedHashMap<E,Object>(capacity, loadFactor) :
+               new FastLinkedHashMap<E,Object>(capacity, loadFactor, false, false) :
                new FastHashMap<E,Object>(capacity, loadFactor, false);
 
         // Read in size

@@ -52,6 +52,14 @@ public class FastLinkedHashMap<K,V>
         this.accessOrder = accessOrder;
     }
 
+    FastLinkedHashMap(int initialCapacity,
+        float loadFactor,
+        boolean accessOrder,
+        boolean withValues) {
+        super(initialCapacity, loadFactor, withValues);
+        this.accessOrder = accessOrder;
+    }
+
     public void clear() {
         super.clear();
         headIndex = -1;
@@ -81,13 +89,16 @@ public class FastLinkedHashMap<K,V>
     }
 
     /**
-     * This method is called before addition of new key/value pair.
+     * This method is called after addition of new key/value pair.
      *
-     * Here we check removeEldestEntry and remove map eldest pair
+     * Here we insert its index to the very end of the linked list
+     * and check removeEldestEntry and remove map eldest pair
      * if it returns true. Doing this check after addition can
      * cause unnecessary resize.
      */
-    protected void beforeAdditionHook() {
+    protected void addHook(int i) {
+        insertIndex(i);
+        //
         if(headIndex < 0) return;
         if(headEntry == null) {
             headEntry = new Entry(headIndex);
@@ -95,15 +106,6 @@ public class FastLinkedHashMap<K,V>
         if(removeEldestEntry(headEntry)) {
             removeKey(headEntry.getKey());
         }
-    }
-
-    /**
-     * This method is called after addition of new key/value pair.
-     *
-     * Here we insert its index to the very end of the linked list.
-     */
-    protected void afterAdditionHook(int i) {
-        insertIndex(i);
     }
 
     /**
@@ -183,7 +185,6 @@ public class FastLinkedHashMap<K,V>
             beforeAfter[headIndex<<1] = i;
             beforeAfter[(last<<1)+1] = i;
         }
-        modCount++;
     }
 
     /**
@@ -197,5 +198,6 @@ public class FastLinkedHashMap<K,V>
             removeIndex(i);
             insertIndex(i);
         }
+        modCount++;
     }
 }

@@ -1,4 +1,5 @@
 import java.util.*;
+import java.io.*;
 import org.junit.*;
 import static org.junit.Assert.*;
 
@@ -48,7 +49,7 @@ public class FastLinkedHashMapTest {
     assertFalse(i.hasNext());
   }
 
-  class HeadEntryTester extends FastLinkedHashMap<String,String> {
+  static class HeadEntryTester extends FastLinkedHashMap<String,String> {
     String lastValue = null;
     protected boolean removeEldestEntry(Map.Entry<String,String> eldest) {
       lastValue = eldest.getValue();
@@ -75,7 +76,7 @@ public class FastLinkedHashMapTest {
     assertEquals("1", map2.lastValue);
   }
 
-  class EldestNullRemovingMap extends FastLinkedHashMap<String,String> {
+  static class EldestNullRemovingMap extends FastLinkedHashMap<String,String> {
     protected boolean removeEldestEntry(Map.Entry<String,String> eldest) {
       return eldest.getKey() == null;
     }
@@ -90,4 +91,184 @@ public class FastLinkedHashMapTest {
     assertFalse(map.containsKey(null));
   }
 
+  // jdk tests
+
+  private static Map serClone(Map m) {
+    Map result = null;
+    try {
+      // Serialize
+      ByteArrayOutputStream bos = new ByteArrayOutputStream();
+      ObjectOutputStream out = new ObjectOutputStream(bos);
+      out.writeObject(m);
+      out.flush();
+
+      // Deserialize
+      ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
+      out.close();
+      ObjectInputStream in = new ObjectInputStream(bis);
+      result = (Map)in.readObject();
+      in.close();
+    } catch(Exception e) {
+      e.printStackTrace();
+    }
+    return result;
+  }
+
+  @Test public void testBasic () {
+    Random rnd = new Random(666);
+    Object nil = new Integer(0);
+    int numItr =  500;
+    int mapSize = 500;
+
+    // Linked List test
+    for (int i=0; i<numItr; i++) {
+      Map m = new FastLinkedHashMap();
+      Object head = nil;
+
+      for (int j=0; j<mapSize; j++) {
+        Object newHead;
+        do {
+          newHead = new Integer(rnd.nextInt());
+        } while (m.containsKey(newHead));
+        m.put(newHead, head);
+        head = newHead;
+      }
+      assertEquals(mapSize, m.size());
+      assertEquals(new HashMap(m).hashCode(), m.hashCode());
+
+      Map m2 = new FastLinkedHashMap(); m2.putAll(m);
+      m2.values().removeAll(m.keySet());
+      assertEquals(1, m2.size());
+      assertTrue(m2.containsValue(nil));
+
+      int j=0;
+      while (head != nil) {
+        assertTrue(m.containsKey(head));
+        Object newHead = m.get(head);
+        assertFalse(newHead == null);
+        m.remove(head);
+        head = newHead;
+        j++;
+      }
+      assertTrue(m.isEmpty());
+      assertEquals(mapSize, j);
+    }
+
+    Map m = new FastLinkedHashMap();
+    for (int i=0; i<mapSize; i++)
+      assertEquals(null, m.put(new Integer(i), new Integer(2*i)));
+    for (int i=0; i<2*mapSize; i++)
+      assertEquals(i%2==0, m.containsValue(new Integer(i)));
+    assertFalse(m.put(nil, nil) == null);
+    Map m2 = new FastLinkedHashMap(); m2.putAll(m);
+    assertEquals(m, m2);
+    assertEquals(m2, m);
+    Set s = m.entrySet(), s2 = m2.entrySet();
+    assertEquals(s, s2);
+    assertEquals(s2, s);
+    assertTrue(s.containsAll(s2));
+    assertTrue(s2.containsAll(s));
+
+    m2 = serClone(m);
+    assertEquals(m, m2);
+    assertEquals(m2, m);
+    s = m.entrySet(); s2 = m2.entrySet();
+    assertEquals(s, s2);
+    assertEquals(s2, s);
+    assertTrue(s.containsAll(s2));
+    assertTrue(s2.containsAll(s));
+
+    s2.removeAll(s);
+    assertTrue(m2.isEmpty());
+
+    m2.putAll(m);
+    m2.clear();
+    assertTrue(m2.isEmpty());
+
+    Iterator it = m.entrySet().iterator();
+    while(it.hasNext()) {
+      it.next();
+      it.remove();
+    }
+    assertTrue(m.isEmpty());
+
+    // Test ordering properties with insert order
+    m = new FastLinkedHashMap();
+    List l = new ArrayList(mapSize);
+    for (int i=0; i<mapSize; i++) {
+      Integer x = new Integer(i);
+      m.put(x, x);
+      l.add(x);
+    }
+    assertEquals(l, new ArrayList(m.keySet()));
+    for (int i=mapSize-1; i>=0; i--) {
+      Integer x = (Integer) l.get(i);
+      assertEquals(x, m.get(x));
+    }
+    assertEquals(l, new ArrayList(m.keySet()));
+
+    for (int i=mapSize-1; i>=0; i--) {
+      Integer x = (Integer) l.get(i);
+      m.put(x, x);
+    }
+    assertEquals(l, new ArrayList(m.keySet()));
+
+    m2 = (Map) ((FastLinkedHashMap)m).clone();
+    assertEquals(m, m2);
+    assertEquals(m2, m);
+
+    List l2 = new ArrayList(l);
+    Collections.shuffle(l2);
+    for (int i=0; i<mapSize; i++) {
+      Integer x = (Integer) l2.get(i);
+      assertEquals(x, m2.get(x));
+    }
+    assertEquals(l, new ArrayList(m2.keySet()));
+
+    // Test ordering properties with access order
+    m = new FastLinkedHashMap(1000, .75f, true);
+    for (int i=0; i<mapSize; i++) {
+      Integer x = new Integer(i);
+      m.put(x, x);
+    }
+    assertEquals(l, new ArrayList(m.keySet()));
+
+    for (int i=0; i<mapSize; i++) {
+      Integer x = (Integer) l2.get(i);
+      assertEquals(x, m.get(x));
+    }
+    assertEquals(l2, new ArrayList(m.keySet()));
+
+    for (int i=0; i<mapSize; i++) {
+      Integer x = new Integer(i);
+      m.put(x, x);
+    }
+    assertEquals(l, new ArrayList(m.keySet()));
+
+    m2 = (Map) ((FastLinkedHashMap)m).clone();
+    assertEquals(m, m2);
+    assertEquals(m2, m);
+    for (int i=0; i<mapSize; i++) {
+      Integer x = (Integer) l.get(i);
+      assertEquals(x, m2.get(x));
+    }
+    assertEquals(l, new ArrayList(m2.keySet()));
+  }
+
+  @Test public void testCache () {
+    final int MAP_SIZE = 10;
+    final int NUM_KEYS = 100;
+
+    Map m = new FastLinkedHashMap() {
+      protected boolean removeEldestEntry(Map.Entry eldest) {
+        return size() > MAP_SIZE;
+      }
+    };
+
+    for (int i = 0; i < NUM_KEYS; i++) {
+      m.put(new Integer(i), "");
+      int eldest = ((Integer) m.keySet().iterator().next()).intValue();
+      assertEquals(Math.max(i-9, 0), eldest);
+    }
+  }
 }

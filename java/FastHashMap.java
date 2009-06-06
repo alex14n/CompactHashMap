@@ -223,7 +223,8 @@ public class FastHashMap<K,V>
     public FastHashMap(Map<? extends K, ? extends V> m) {
         this(Math.max((int) (m.size() / DEFAULT_LOAD_FACTOR) + 1,
                       DEFAULT_INITIAL_CAPACITY), DEFAULT_LOAD_FACTOR);
-        putAll(m); // ToDo: putAllNew
+        for (Map.Entry<? extends K, ? extends V> e : m.entrySet())
+            put(e.getKey(), e.getValue(), false);
     }
 
     /**
@@ -325,39 +326,38 @@ public class FastHashMap<K,V>
      *         previously associated <tt>null</tt> with <tt>key</tt>.)
      */
     public V put(K key, V value) {
+        return put(key, value, true);
+    }
+    final V put(K key, V value, boolean searchForExistingKey) {
         int hc = hash(key);
         int i = hc & (hashLen - 1);
         int next = myIndices[i];
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         // Look if key is already in this map
-        int k;
-        for (int j = ~next; j >= 0; j = ~myIndices[hashLen+k]) {
-            k = j & (hashLen - 1);
-            if (hcBits == (j & mask)) {
-                Object o = myKeyValues[k<<keyShift];
-                if (o == key || o != null && o.equals(key)) {
-                    Object oldValue = keyShift > 0 ? myKeyValues[(k<<keyShift)+1] : DUMMY_VALUE;
-                    if (keyShift > 0) myKeyValues[(k<<keyShift)+1] = value;
-                    updateHook(k);
-                    return (V)oldValue;
+        if(searchForExistingKey) {
+            int k;
+            for (int j = ~next; j >= 0; j = ~myIndices[hashLen+k]) {
+                k = j & (hashLen - 1);
+                if (hcBits == (j & mask)) {
+                    Object o = myKeyValues[k<<keyShift];
+                    if (o == key || o != null && o.equals(key)) {
+                        Object oldValue = keyShift > 0 ? myKeyValues[(k<<keyShift)+1] : DUMMY_VALUE;
+                        if (keyShift > 0) myKeyValues[(k<<keyShift)+1] = value;
+                        updateHook(k);
+                        return (V)oldValue;
+                    }
                 }
+                if ((j & END_OF_LIST) != 0) break;
             }
-            if ((j & END_OF_LIST) != 0) break;
         }
-        //
-        int mc = modCount;
-        beforeAdditionHook();
         // Resize if needed
         if (size >= threshold) {
             resize();
             i = hc & (hashLen - 1);
             mask = AVAILABLE_BITS ^ (hashLen-1);
             hcBits = hc & mask;
-            mc--;
-        }
-        if(mc != modCount) {
-          next = myIndices[i];
+            next = myIndices[i];
         }
         // Find a place for new element
         int newIndex;
@@ -381,7 +381,8 @@ public class FastHashMap<K,V>
         if (next < 0) myIndices[hashLen + newIndex] = next;
         myIndices[i] = ~(newIndex | hcBits | (next < 0 ? 0 : END_OF_LIST));
         size++;
-        afterAdditionHook(newIndex);
+        modCount++;
+        addHook(newIndex);
         return null;
     }
 
@@ -631,7 +632,6 @@ public class FastHashMap<K,V>
         protected int nextIndex = iterateFirst();
         protected int lastIndex = -1;
         int expectedModCount = modCount; // For fast-fail
-        int maxIndex = firstEmptyIndex;
         public final boolean hasNext() {
             return nextIndex >= 0;
         }
@@ -642,9 +642,6 @@ public class FastHashMap<K,V>
                 throw new NoSuchElementException();
             lastIndex = nextIndex;
             nextIndex = iterateNext(nextIndex);
-            // Do not iterate over elements that were added
-            // after this iterator was created.
-            if (nextIndex >= maxIndex) nextIndex = -1;
             return value();
         }
         public final void remove() {
@@ -843,7 +840,7 @@ public class FastHashMap<K,V>
         for (int i=0; i<size; i++) {
             K key = (K) s.readObject();
             V value = (V) s.readObject();
-            put(key, value); // ToDo: putNew
+            put(key, value, false);
         }
     }
 
@@ -852,8 +849,7 @@ public class FastHashMap<K,V>
     float loadFactor()   { return loadFactor; }
 
     // These hooks are needed for LinkedHashMap
-    void beforeAdditionHook() { }
-    void afterAdditionHook(int i) { }
+    void addHook(int i) { }
     void updateHook(int i) { }
     void removeHook(int i) { }
 
@@ -885,9 +881,9 @@ public class FastHashMap<K,V>
             K key1 = this.getKey();
             K key2 = that.getKey();
             if(key1 == key2 || (key1 != null && key1.equals(key2))) {
-                V val1 = this.getValue();
-                V val2 = that.getValue();
-                return  val1 == val2 || (val1 != null && val1.equals(val2));
+                V value1 = this.getValue();
+                V value2 = that.getValue();
+                return value1 == value2 || (value1 != null && value1.equals(value2));
             }
             return false;
         }

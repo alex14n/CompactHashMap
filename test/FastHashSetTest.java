@@ -29,11 +29,6 @@ public class FastHashSetTest {
     Iterator<String> i = set.iterator();
     assertEquals("1", i.next());
     assertEquals(null, i.next());
-
-    // This is not structural modification:
-    set.add("4");
-
-    // Continue
     assertEquals("2", i.next());
     assertEquals("3", i.next());
     assertFalse(i.hasNext());
