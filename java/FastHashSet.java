@@ -61,6 +61,7 @@ public class FastHashSet<E>
         map.clear();
     }
 
+    @SuppressWarnings("unchecked")
     public FastHashSet<E> clone() {
         FastHashSet<E> newSet = null;
         try {
@@ -105,6 +106,7 @@ public class FastHashSet<E>
 
         // Read in all elements in the proper order.
         for (int i=0; i<size; i++) {
+            @SuppressWarnings("unchecked")
             E e = (E) s.readObject();
             map.put(e, null);
         }

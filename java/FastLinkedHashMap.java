@@ -140,6 +140,7 @@ public class FastLinkedHashMap<K,V>
 
     //
 
+    @SuppressWarnings("unchecked")
     public V get(Object key) {
         int i = positionOf(key);
         if(i < 0) return null;

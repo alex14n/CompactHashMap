@@ -45,6 +45,7 @@ public class FastHashMapTest {
   @Test public void testRemove () {
     FastHashMap<String,String> map = new FastHashMap<String,String> ();
     int c;
+    Iterator<String> it;
 
     assertEquals(null, map.remove(null));
     assertEquals(null, map.remove("test"));
@@ -63,7 +64,7 @@ public class FastHashMapTest {
       assertFalse(map.containsValue(i+"x"));
       assertEquals(59-i, map.size());
       c = 0;
-      for (String e : map.keySet()) c++;
+      for(it = map.keySet().iterator(); it.hasNext(); it.next()) c++;
       assertEquals (59-i, c);
     }
     for (int i = 0; i < 20; i++) {
@@ -104,7 +105,7 @@ public class FastHashMapTest {
       assertEquals(i+"z", map.get("c"+i));
 
     c = 0;
-    for (String e : map.keySet()) c++;
+    for(it = map.keySet().iterator(); it.hasNext(); it.next()) c++;
     assertEquals (50, c);
   }
 
@@ -227,6 +228,7 @@ public class FastHashMapTest {
     // Read it
     ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
     ObjectInputStream ois = new ObjectInputStream(bis);
+    @SuppressWarnings("unchecked")
     FastHashMap<String,String> read = (FastHashMap<String,String>)ois.readObject();
     assertEquals(0, ois.available());
     ois.close();
@@ -299,8 +301,10 @@ public class FastHashMapTest {
     new FastHashMap<String,String> (100, .69f);
   }
 
-  static class ReadObject extends FastHashMap {
+  static class ReadObject extends FastHashMap<Object,Object> {
+    private static final long serialVersionUID = 0L;
     class ValueWrapper implements Serializable {
+      private static final long serialVersionUID = 0L;
       private Object mValue;
       ValueWrapper(Object value) {
         mValue = value;
@@ -390,8 +394,8 @@ public class FastHashMapTest {
 
   @Test(expected=ConcurrentModificationException.class)
   public void testEmptyMapIterator () {
-    Map map = new FastHashMap();
-    Iterator iter = iter = map.entrySet().iterator();
+    Map<String,String> map = new FastHashMap<String,String>();
+    Iterator<Map.Entry<String,String>> iter = map.entrySet().iterator();
     map.put("key", "value");
     iter.next();
   }
@@ -409,7 +413,7 @@ public class FastHashMapTest {
   }
 
   @Test public void testToArray2 () {
-    Map m = new FastHashMap();
+    Map<String,String> m = new FastHashMap<String,String>();
     m.put("french", "connection");
     m.put("polish", "sausage");
     Object[] mArray = m.entrySet().toArray();
@@ -427,7 +431,8 @@ public class FastHashMapTest {
     assertEquals(1, es.toArray().length);
     Object[] x = es.toArray(new Object[]{Boolean.TRUE, Boolean.TRUE});
     assertEquals(null, x[1]);
-    Map.Entry e = (Map.Entry) x[0];
+    @SuppressWarnings("unchecked")
+    Map.Entry<Integer,Integer> e = (Map.Entry<Integer,Integer>) x[0];
     assertEquals(new Integer(7), e.getKey());
     assertEquals(new Integer(49), e.getValue());
   }

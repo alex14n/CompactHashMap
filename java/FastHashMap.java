@@ -331,6 +331,7 @@ public class FastHashMap<K,V>
     public V put(K key, V value) {
         return put(key, value, true);
     }
+    @SuppressWarnings("unchecked")
     final V put(K key, V value, boolean searchForExistingKey) {
         int hc = hash(key);
         int i = hc & (hashLen - 1);
@@ -414,6 +415,7 @@ public class FastHashMap<K,V>
      * @param key key whose mapping is to be removed from the map
      * @return NOT_FOUND or old value
      */
+    @SuppressWarnings("unchecked")
     final V removeKey(Object key) {
         int hc = hash(key);
         int mask = AVAILABLE_BITS ^ (hashLen-1);
@@ -475,6 +477,7 @@ public class FastHashMap<K,V>
      *
      * @return a shallow copy of this map
      */
+    @SuppressWarnings("unchecked")
     public FastHashMap<K,V> clone() {
         FastHashMap<K,V> that = null;
         try {
@@ -525,6 +528,7 @@ public class FastHashMap<K,V>
      *
      * @see #put(Object, Object)
      */
+    @SuppressWarnings("unchecked")
     public V get(Object key) {
         int i = positionOf(key);
         return i < 0 ? null : (V)(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE);
@@ -660,6 +664,7 @@ public class FastHashMap<K,V>
     }
 
     private final class KeyIterator extends HashIterator<K> {
+        @SuppressWarnings("unchecked")
         K value() {
             return (K)myKeyValues[lastIndex<<keyShift];
         }
@@ -720,6 +725,7 @@ public class FastHashMap<K,V>
         public boolean contains(Object o) {
             if (!(o instanceof Map.Entry))
                 return false;
+            @SuppressWarnings("unchecked")
             Map.Entry<K,V> e = (Map.Entry<K,V>) o;
             int i = positionOf(e.getKey());
             if (i < 0) return false;
@@ -727,6 +733,7 @@ public class FastHashMap<K,V>
             Object v2 = e.getValue();
             return v1 == v2 || v1 != null && v1.equals(v2);
         }
+        @SuppressWarnings("unchecked")
         public boolean remove(Object o) {
             if (!contains(o)) return false;
             removeKey(((Map.Entry<K,V>)o).getKey());
@@ -762,6 +769,7 @@ public class FastHashMap<K,V>
     }
 
     private final class ValueIterator extends HashIterator<V> {
+        @SuppressWarnings("unchecked")
         V value() {
             return (V)(keyShift > 0 ? myKeyValues[(lastIndex<<keyShift)+1] : DUMMY_VALUE);
         }
@@ -841,7 +849,9 @@ public class FastHashMap<K,V>
 
         // Read the keys and values, and put the mappings in the HashMap
         for (int i=0; i<size; i++) {
+            @SuppressWarnings("unchecked")
             K key = (K) s.readObject();
+            @SuppressWarnings("unchecked")
             V value = (V) s.readObject();
             put(key, value, false);
         }
@@ -859,6 +869,7 @@ public class FastHashMap<K,V>
     /**
      *
      */
+    @SuppressWarnings("unchecked")
     final class Entry implements Map.Entry<K,V> {
         private final int index;
         Entry(int index) {

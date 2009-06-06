@@ -9,12 +9,14 @@ public class FastLinkedHashSetTest {
 
   static Random rnd = new Random(666);
 
-  static Set clone(Set s) {
-    Set clone;
+  static Set<Integer> clone(Set<Integer> s) {
+    Set<Integer> clone;
     int method = rnd.nextInt(3);
-    clone = (method==0 ?  (Set) ((FastLinkedHashSet)s).clone() :
-            (method==1 ? new FastLinkedHashSet(Arrays.asList(s.toArray())) :
-            serClone(s)));
+    switch(method) {
+      case 0: clone = ((FastLinkedHashSet<Integer>)s).clone(); break;
+      case 1: clone = new FastLinkedHashSet(Arrays.asList(s.toArray())); break;
+      default: clone = serClone(s); break;
+    }
     assertEquals(s, clone);
     assertEquals(clone, s);
     assertTrue(s.containsAll(clone));
@@ -22,8 +24,9 @@ public class FastLinkedHashSetTest {
     return clone;
   }
 
-  private static Set serClone(Set m) {
-    Set result = null;
+  @SuppressWarnings("unchecked")
+  private static Set<Integer> serClone(Set<Integer> m) {
+    Set<Integer> result = null;
     try {
       // Serialize
       ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -35,7 +38,7 @@ public class FastLinkedHashSetTest {
       ByteArrayInputStream bis = new ByteArrayInputStream(bos.toByteArray());
       out.close();
       ObjectInputStream in = new ObjectInputStream(bis);
-      result = (Set)in.readObject();
+      result = (Set<Integer>)in.readObject();
       in.close();
     } catch(Exception e) {
       e.printStackTrace();
@@ -43,7 +46,7 @@ public class FastLinkedHashSetTest {
     return result;
   }
 
-  static void AddRandoms(Set s, int n) {
+  static void AddRandoms(Set<Integer> s, int n) {
     for (int i=0; i<n; i++) {
       int r = rnd.nextInt() % n;
       Integer e = new Integer(r < 0 ? -r : r);
@@ -64,17 +67,17 @@ public class FastLinkedHashSetTest {
     int setSize = 500;
 
     for (int i=0; i<numItr; i++) {
-      Set s1 = new FastLinkedHashSet();
+      Set<Integer> s1 = new FastLinkedHashSet<Integer>();
       AddRandoms(s1, setSize);
 
-      Set s2 = new FastLinkedHashSet();
+      Set<Integer> s2 = new FastLinkedHashSet<Integer>();
       AddRandoms(s2, setSize);
 
-      Set intersection = clone(s1);
+      Set<Integer> intersection = clone(s1);
       intersection.retainAll(s2);
-      Set diff1 = clone(s1); diff1.removeAll(s2);
-      Set diff2 = clone(s2); diff2.removeAll(s1);
-      Set union = clone(s1); union.addAll(s2);
+      Set<Integer> diff1 = clone(s1); diff1.removeAll(s2);
+      Set<Integer> diff2 = clone(s2); diff2.removeAll(s1);
+      Set<Integer> union = clone(s1); union.addAll(s2);
 
       assertFalse(diff1.removeAll(diff2));
       assertFalse(diff1.removeAll(intersection));
@@ -86,9 +89,9 @@ public class FastLinkedHashSetTest {
       intersection.addAll(diff1); intersection.addAll(diff2);
       assertEquals(union, intersection);
 
-      assertEquals(union.hashCode(), new FastLinkedHashSet(union).hashCode());
+      assertEquals(union.hashCode(), new FastLinkedHashSet<Integer>(union).hashCode());
 
-      Iterator e = union.iterator();
+      Iterator<Integer> e = union.iterator();
       while (e.hasNext())
         assertTrue(intersection.remove(e.next()));
       assertTrue(intersection.isEmpty());
