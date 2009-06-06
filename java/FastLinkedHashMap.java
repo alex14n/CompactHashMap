@@ -197,7 +197,7 @@ public class FastLinkedHashMap<K,V>
         if(accessOrder) {
             removeIndex(i);
             insertIndex(i);
+            modCount++;
         }
-        modCount++;
     }
 }
