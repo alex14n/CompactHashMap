@@ -56,10 +56,13 @@ public class FastHashMap<K,V>
      * otherwise encounter collisions for hashCodes that do not differ
      * in lower bits. Note: Null keys always map to hash 0, thus index 0.
      */
-    final static int hash(Object o) {
+    final static int hash(int h) {
         // This function ensures that hashCodes that differ only by
         // constant multiples at each bit position have a bounded
         // number of collisions (approximately 8 at default load factor).
+        return (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h;
+    }
+    final static int hash(Object o) {
         int h = o == null ? 0 : o.hashCode();
         return (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h;
     }
