@@ -284,7 +284,7 @@ public class FastHashSet<E>
         for (int i=0; i<size; i++) {
             @SuppressWarnings("unchecked")
             E e = (E) s.readObject();
-            map.put(e, null);
+            map.put(e, null, false);
         }
     }
 }
