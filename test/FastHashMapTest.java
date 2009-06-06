@@ -242,4 +242,13 @@ public class FastHashMapTest {
     assertFalse(read.containsKey("d"));
     assertEquals(map, read);
   }
+
+  @Test public void testEntrySetValue () {
+    FastHashMap<String,String> map = new FastHashMap<String,String> ();
+    map.put("a","b");
+    Map.Entry<String,String> entry = map.entrySet().iterator().next();
+    assertEquals("b", entry.setValue("x"));
+    assertEquals("x", map.get("a"));
+  }
+
 }

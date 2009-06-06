@@ -90,9 +90,7 @@ public class FastLinkedHashMap<K,V>
     protected void beforeAdditionHook() {
         if(headIndex < 0) return;
         if(headEntry == null) {
-            K key = (K)myKeyValues[headIndex<<keyShift];
-            V value = (V)(keyShift > 0 ? myKeyValues[(headIndex<<keyShift)+1] : DUMMY_VALUE);
-            headEntry = new AbstractMap.SimpleEntry<K,V>(key, value);
+            headEntry = new Entry(headIndex);
         }
         if(removeEldestEntry(headEntry)) {
             removeKey(headEntry.getKey());
@@ -125,10 +123,6 @@ public class FastLinkedHashMap<K,V>
      */
     protected void updateHook(int i) {
         updateIndex(i);
-        if(i == headIndex && headEntry != null) {
-            V value = (V)(keyShift > 0 ? myKeyValues[(headIndex<<keyShift)+1] : DUMMY_VALUE);
-            headEntry.setValue(value);
-        }
     }
 
     // Iteration order based on the linked list.

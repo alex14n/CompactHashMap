@@ -67,20 +67,20 @@ public class FastHashMap<K,V>
     /**
      * The number of key-value mappings contained in this map.
      */
-    transient protected int size = 0;
+    transient int size = 0;
 
     /**
      * Arrays with stored keys and values.
      * Storing them in one array in neighbour cells
      * is faster since it's reading adjacent memory addresses.
      */
-    transient protected Object[] myKeyValues;
+    transient Object[] myKeyValues;
 
     /**
      * 1 if myKeyValues contains keys and values,
      * 0 if only keys (to save memory in HashSet).
      */
-    transient protected int keyShift;
+    transient int keyShift;
 
     /**
      * Value to use if keyShift is 0.
@@ -112,7 +112,7 @@ public class FastHashMap<K,V>
      * Index of the first not occupied position in array.
      * All elements starting with this index are free.
      */
-    transient protected int firstEmptyIndex = 0;
+    transient int firstEmptyIndex = 0;
 
     /**
      * Index of first element in deleted list,
@@ -129,7 +129,7 @@ public class FastHashMap<K,V>
      * The next size value at which to resize (capacity * load factor).
      * @serial
      */
-    protected int threshold;
+    int threshold;
 
     /**
      * The load factor for the hash table.
@@ -628,35 +628,32 @@ public class FastHashMap<K,V>
      * value() method should return the real elements.
      */
     private abstract class HashIterator<E> implements Iterator<E> {
-        protected int i = iterateFirst();
-        protected Object lastKey = NOT_FOUND;
-        protected Object lastValue = NOT_FOUND;
+        protected int nextIndex = iterateFirst();
+        protected int lastIndex = -1;
         int expectedModCount = modCount; // For fast-fail
         int maxIndex = firstEmptyIndex;
         public final boolean hasNext() {
-            return i >= 0;
+            return nextIndex >= 0;
         }
         public final E next() {
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
-            if (i < 0)
+            if (nextIndex < 0)
                 throw new NoSuchElementException();
-            lastKey = myKeyValues[i<<keyShift];
-            lastValue = keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE;
-            i = iterateNext(i);
+            lastIndex = nextIndex;
+            nextIndex = iterateNext(nextIndex);
             // Do not iterate over elements that were added
             // after this iterator was created.
-            if (i >= maxIndex) i = -1;
+            if (nextIndex >= maxIndex) nextIndex = -1;
             return value();
         }
         public final void remove() {
-            if (lastKey == NOT_FOUND)
+            if (lastIndex < 0)
                 throw new IllegalStateException();
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
-            removeKey(lastKey);
-            lastKey = NOT_FOUND;
-            lastValue = NOT_FOUND;
+            removeKey(myKeyValues[lastIndex<<keyShift]);
+            lastIndex = -1;
             expectedModCount = modCount;
         }
         protected abstract E value();
@@ -664,7 +661,7 @@ public class FastHashMap<K,V>
 
     private final class KeyIterator extends HashIterator<K> {
         protected K value() {
-            return (K)lastKey;
+            return (K)myKeyValues[lastIndex<<keyShift];
         }
     }
 
@@ -712,7 +709,7 @@ public class FastHashMap<K,V>
 
     private final class EntryIterator extends HashIterator<Map.Entry<K,V>> {
         protected Map.Entry<K,V> value() {
-            return new AbstractMap.SimpleEntry<K,V>((K)lastKey, (V)lastValue);
+            return new Entry(lastIndex);
         }
     }
 
@@ -766,7 +763,7 @@ public class FastHashMap<K,V>
 
     private final class ValueIterator extends HashIterator<V> {
         protected V value() {
-            return (V)lastValue;
+            return (V)(keyShift > 0 ? myKeyValues[(lastIndex<<keyShift)+1] : DUMMY_VALUE);
         }
     }
 
@@ -855,8 +852,53 @@ public class FastHashMap<K,V>
     float loadFactor()   { return loadFactor; }
 
     // These hooks are needed for LinkedHashMap
-    protected void beforeAdditionHook() { }
-    protected void afterAdditionHook(int i) { }
-    protected void updateHook(int i) { }
-    protected void removeHook(int i) { }
+    void beforeAdditionHook() { }
+    void afterAdditionHook(int i) { }
+    void updateHook(int i) { }
+    void removeHook(int i) { }
+
+    /**
+     *
+     */
+    final class Entry implements Map.Entry<K,V> {
+        private final int index;
+        Entry(int index) {
+            this.index = index;
+        }
+        public final K getKey() {
+            return (K)myKeyValues[index<<keyShift];
+        }
+        public final V getValue() {
+            return (V)(keyShift > 0 ? myKeyValues[(index<<keyShift)+1] : DUMMY_VALUE);
+        }
+        public final V setValue(V newValue) {
+            if(keyShift == 0) throw new UnsupportedOperationException();
+            V oldValue = (V)myKeyValues[(index<<keyShift)+1];
+            myKeyValues[(index<<keyShift)+1] = newValue;
+            updateHook(index);
+            return oldValue;
+        }
+        public boolean equals(Object o) {
+            if (!(o instanceof Map.Entry))
+                return false;
+            Map.Entry<K,V> that = (Map.Entry<K,V>)o;
+            K key1 = this.getKey();
+            K key2 = that.getKey();
+            if(key1 == key2 || (key1 != null && key1.equals(key2))) {
+                V val1 = this.getValue();
+                V val2 = that.getValue();
+                return  val1 == val2 || (val1 != null && val1.equals(val2));
+            }
+            return false;
+        }
+        public int hashCode() {
+            K key = getKey();
+            V value = getValue();
+            return (key   == null ? 0 :   key.hashCode()) ^
+                   (value == null ? 0 : value.hashCode());
+        }
+        public String toString() {
+            return getKey() + "=" + getValue();
+        }
+    }
 }
