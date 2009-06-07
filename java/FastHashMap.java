@@ -997,7 +997,7 @@ public class FastHashMap<K,V>
             if(keyIndexShift > 0 && keyValueTable[index<<keyIndexShift] == key) {
                 @SuppressWarnings("unchecked")
                 V oldValue = (V)keyValueTable[(index<<keyIndexShift)+1];
-                keyValueTable[(index<<keyIndexShift)+1] = newValue;
+                keyValueTable[(index<<keyIndexShift)+1] = value = newValue;
                 return oldValue;
             }
             V oldValue = value;
