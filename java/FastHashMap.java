@@ -168,16 +168,16 @@ public class FastHashMap<K,V>
      * Storing them in one array in neighbour cells
      * is faster since it's reading adjacent memory addresses.
      */
-    transient Object[] myKeyValues;
+    transient Object[] keyValueTable;
 
     /**
-     * 1 if myKeyValues contains keys and values,
+     * 1 if keyValueTable contains keys and values,
      * 0 if only keys (to save memory in HashSet).
      */
-    transient int keyShift;
+    transient int keyIndexShift;
 
     /**
-     * Value to use if keyShift is 0.
+     * Value to use if keyIndexShift is 0.
      */
     final static Object DUMMY_VALUE = new Object();
 
@@ -200,7 +200,7 @@ public class FastHashMap<K,V>
      * deleted indices are not inverted and stored as positive,
      * but to separate them from default zero value we add 1 to them.
      */
-    transient private int[] myIndices;
+    transient private int[] indexTable;
 
     /**
      * Index of the first not occupied position in array.
@@ -257,9 +257,9 @@ public class FastHashMap<K,V>
         loadFactor = DEFAULT_LOAD_FACTOR;
         hashLen = DEFAULT_INITIAL_CAPACITY;
         threshold = (int)(hashLen * loadFactor);
-        keyShift = withValues ? 1 : 0;
-        myKeyValues = new Object[threshold<<keyShift];
-        myIndices = new int[hashLen+threshold];
+        keyIndexShift = withValues ? 1 : 0;
+        keyValueTable = new Object[threshold<<keyIndexShift];
+        indexTable = new int[hashLen+threshold];
         init();
     }
 
@@ -297,9 +297,9 @@ public class FastHashMap<K,V>
         if (threshold < 1)
             throw new IllegalArgumentException(
                 "Illegal load factor: " + loadFactor);
-        keyShift = withValues ? 1 : 0;
-        myKeyValues = new Object[threshold<<keyShift];
-        myIndices = new int[hashLen+threshold];
+        keyIndexShift = withValues ? 1 : 0;
+        keyValueTable = new Object[threshold<<keyIndexShift];
+        indexTable = new int[hashLen+threshold];
         init();
     }
 
@@ -355,7 +355,7 @@ public class FastHashMap<K,V>
     void resize() {
         int newHashLen = hashLen << 1;
         int newValueLen = (int)(newHashLen * loadFactor);
-        Object[] newKeyValues = Arrays.copyOf(myKeyValues,newValueLen<<keyShift);
+        Object[] newKeyValues = Arrays.copyOf(keyValueTable,newValueLen<<keyIndexShift);
         int[] newIndices = new int[newHashLen+newValueLen];
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int newMask = AVAILABLE_BITS ^ (newHashLen-1);
@@ -363,7 +363,7 @@ public class FastHashMap<K,V>
             int next1 = 0;
             int next2 = 0;
             int arrayIndex;
-            for (int j = ~myIndices[i]; j >= 0; j = ~myIndices[hashLen + arrayIndex]) {
+            for (int j = ~indexTable[i]; j >= 0; j = ~indexTable[hashLen + arrayIndex]) {
                 arrayIndex = j & (hashLen-1);
                 int newHashIndex = i | (j & (newMask ^ mask));
                 // Each old element from the old hash basket may go
@@ -384,8 +384,8 @@ public class FastHashMap<K,V>
         }
         hashLen = newHashLen;
         threshold = newValueLen;
-        myKeyValues = newKeyValues;
-        myIndices = newIndices;
+        keyValueTable = newKeyValues;
+        indexTable = newIndices;
     }
 
     /**
@@ -399,12 +399,12 @@ public class FastHashMap<K,V>
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         int curr = hc & (hashLen-1);
-        for (int i = ~myIndices[curr]; i >= 0; i = ~myIndices[curr]) {
+        for (int i = ~indexTable[curr]; i >= 0; i = ~indexTable[curr]) {
             curr = i & (hashLen-1);
             // Check if stored hashcode bits are equal
             // to hashcode of the key we are looking for
             if (hcBits == (i & mask)) {
-                Object x = myKeyValues[curr<<keyShift];
+                Object x = keyValueTable[curr<<keyIndexShift];
                 if (x == key || x != null && x.equals(key))
                     return curr;
             }
@@ -422,7 +422,7 @@ public class FastHashMap<K,V>
      * @return <tt>true</tt> if i-th is empty (was deleted)
      */
     final private boolean isEmpty(int i) {
-        return /* i >= firstEmptyIndex || */ i == firstDeletedIndex || myIndices[hashLen+i] > 0;
+        return /* i >= firstEmptyIndex || */ i == firstDeletedIndex || indexTable[hashLen+i] > 0;
     }
 
     /**
@@ -450,19 +450,19 @@ public class FastHashMap<K,V>
     final V put(K key, V value, boolean searchForExistingKey) {
         int hc = hash(key);
         int i = hc & (hashLen - 1);
-        int next = myIndices[i];
+        int next = indexTable[i];
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         // Look if key is already in this map
         if(searchForExistingKey) {
             int k;
-            for (int j = ~next; j >= 0; j = ~myIndices[hashLen+k]) {
+            for (int j = ~next; j >= 0; j = ~indexTable[hashLen+k]) {
                 k = j & (hashLen - 1);
                 if (hcBits == (j & mask)) {
-                    Object o = myKeyValues[k<<keyShift];
+                    Object o = keyValueTable[k<<keyIndexShift];
                     if (o == key || o != null && o.equals(key)) {
-                        Object oldValue = keyShift > 0 ? myKeyValues[(k<<keyShift)+1] : DUMMY_VALUE;
-                        if (keyShift > 0) myKeyValues[(k<<keyShift)+1] = value;
+                        Object oldValue = keyIndexShift > 0 ? keyValueTable[(k<<keyIndexShift)+1] : DUMMY_VALUE;
+                        if (keyIndexShift > 0) keyValueTable[(k<<keyIndexShift)+1] = value;
                         updateHook(k);
                         return (V)oldValue;
                     }
@@ -476,29 +476,29 @@ public class FastHashMap<K,V>
             i = hc & (hashLen - 1);
             mask = AVAILABLE_BITS ^ (hashLen-1);
             hcBits = hc & mask;
-            next = myIndices[i];
+            next = indexTable[i];
         }
         // Find a place for new element
         int newIndex;
         // First we reuse deleted positions
         if (firstDeletedIndex >= 0) {
             newIndex = firstDeletedIndex;
-            int di = myIndices[hashLen+firstDeletedIndex];
+            int di = indexTable[hashLen+firstDeletedIndex];
             if (di == END_OF_LIST)
                 firstDeletedIndex = -1;
             else
                 firstDeletedIndex = di-1;
-            if (next >= 0) myIndices[hashLen+newIndex] = 0;
+            if (next >= 0) indexTable[hashLen+newIndex] = 0;
             modCount++;
         } else {
             newIndex = firstEmptyIndex;
             firstEmptyIndex++;
         }
         // Insert it
-        myKeyValues[newIndex<<keyShift] = key;
-        if (keyShift > 0) myKeyValues[(newIndex<<keyShift)+1] = value;
-        if (next < 0) myIndices[hashLen + newIndex] = next;
-        myIndices[i] = ~(newIndex | hcBits | (next < 0 ? 0 : END_OF_LIST));
+        keyValueTable[newIndex<<keyIndexShift] = key;
+        if (keyIndexShift > 0) keyValueTable[(newIndex<<keyIndexShift)+1] = value;
+        if (next < 0) indexTable[hashLen + newIndex] = next;
+        indexTable[i] = ~(newIndex | hcBits | (next < 0 ? 0 : END_OF_LIST));
         size++;
         modCount++;
         addHook(newIndex);
@@ -537,30 +537,30 @@ public class FastHashMap<K,V>
         int hcBits = hc & mask;
         int prev = -1;
         int curr = hc & (hashLen-1);
-        for (int i = ~myIndices[curr]; i >= 0; i = ~myIndices[curr]) {
+        for (int i = ~indexTable[curr]; i >= 0; i = ~indexTable[curr]) {
             int j = i & (hashLen-1);
             int k = hashLen + j;
             if (hcBits == (i & mask)) {
-                Object o = myKeyValues[j<<keyShift];
+                Object o = keyValueTable[j<<keyIndexShift];
                 if (o == key || o != null && o.equals(key)) {
                     size--;
                     if((i & END_OF_LIST) != 0) {
                         if (prev >= 0)
-                            myIndices[prev] ^= END_OF_LIST;
+                            indexTable[prev] ^= END_OF_LIST;
                         else
-                            myIndices[curr] = 0;
+                            indexTable[curr] = 0;
                     } else {
-                        myIndices[curr] = myIndices[k];
+                        indexTable[curr] = indexTable[k];
                     }
                     if (j == firstEmptyIndex-1) {
                         firstEmptyIndex = j;
                     } else {
-                        myIndices[k] = firstDeletedIndex < 0 ? END_OF_LIST : firstDeletedIndex+1;
+                        indexTable[k] = firstDeletedIndex < 0 ? END_OF_LIST : firstDeletedIndex+1;
                         firstDeletedIndex = j;
                     }
-                    Object oldValue = keyShift > 0 ? myKeyValues[(j<<keyShift)+1] : DUMMY_VALUE;
-                    myKeyValues[j<<keyShift] = null;
-                    if (keyShift > 0) myKeyValues[(j<<keyShift)+1] = null;
+                    Object oldValue = keyIndexShift > 0 ? keyValueTable[(j<<keyIndexShift)+1] : DUMMY_VALUE;
+                    keyValueTable[j<<keyIndexShift] = null;
+                    if (keyIndexShift > 0) keyValueTable[(j<<keyIndexShift)+1] = null;
                     modCount++;
                     removeHook(j);
                     return (V)oldValue;
@@ -578,8 +578,8 @@ public class FastHashMap<K,V>
      * The map will be empty after this call returns.
      */
     public void clear() {
-        Arrays.fill(myKeyValues, 0, firstEmptyIndex<<keyShift, null);
-        Arrays.fill(myIndices, 0, hashLen + firstEmptyIndex, 0);
+        Arrays.fill(keyValueTable, 0, firstEmptyIndex<<keyIndexShift, null);
+        Arrays.fill(indexTable, 0, hashLen + firstEmptyIndex, 0);
         size = 0;
         firstEmptyIndex = 0;
         firstDeletedIndex = -1;
@@ -599,8 +599,8 @@ public class FastHashMap<K,V>
             that = (FastHashMap<K,V>)super.clone();
         } catch (CloneNotSupportedException e) {
         }
-        that.myKeyValues = myKeyValues.clone();
-        that.myIndices = myIndices.clone();
+        that.keyValueTable = keyValueTable.clone();
+        that.indexTable = indexTable.clone();
         that.keySet = null;
         that.values = null;
         that.entrySet = null;
@@ -646,7 +646,7 @@ public class FastHashMap<K,V>
     @SuppressWarnings("unchecked")
     public V get(Object key) {
         int i = positionOf(key);
-        return i < 0 ? null : (V)(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE);
+        return i < 0 ? null : (V)(keyIndexShift > 0 ? keyValueTable[(i<<keyIndexShift)+1] : DUMMY_VALUE);
     }
 
     /**
@@ -684,10 +684,10 @@ public class FastHashMap<K,V>
      *         specified value
      */
     public boolean containsValue(Object value) {
-        if (keyShift == 0) return size > 0 && value == DUMMY_VALUE;
+        if (keyIndexShift == 0) return size > 0 && value == DUMMY_VALUE;
         for (int i = 0; i < firstEmptyIndex ; i++)
             if (!isEmpty(i)) { // Not deleted
-                Object o = myKeyValues[(i<<keyShift)+1];
+                Object o = keyValueTable[(i<<keyIndexShift)+1];
                 if (o == value || o != null && o.equals(value))
                     return true;
             }
@@ -771,7 +771,7 @@ public class FastHashMap<K,V>
                 throw new IllegalStateException();
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
-            removeKey(myKeyValues[lastIndex<<keyShift]);
+            removeKey(keyValueTable[lastIndex<<keyIndexShift]);
             lastIndex = -1;
             expectedModCount = modCount;
         }
@@ -781,7 +781,7 @@ public class FastHashMap<K,V>
     private final class KeyIterator extends HashIterator<K> {
         @SuppressWarnings("unchecked")
         K value() {
-            return (K)myKeyValues[lastIndex<<keyShift];
+            return (K)keyValueTable[lastIndex<<keyIndexShift];
         }
     }
 
@@ -844,7 +844,7 @@ public class FastHashMap<K,V>
             Map.Entry<K,V> e = (Map.Entry<K,V>) o;
             int i = positionOf(e.getKey());
             if (i < 0) return false;
-            Object v1 = keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE;
+            Object v1 = keyIndexShift > 0 ? keyValueTable[(i<<keyIndexShift)+1] : DUMMY_VALUE;
             Object v2 = e.getValue();
             return v1 == v2 || v1 != null && v1.equals(v2);
         }
@@ -886,7 +886,7 @@ public class FastHashMap<K,V>
     private final class ValueIterator extends HashIterator<V> {
         @SuppressWarnings("unchecked")
         V value() {
-            return (V)(keyShift > 0 ? myKeyValues[(lastIndex<<keyShift)+1] : DUMMY_VALUE);
+            return (V)(keyIndexShift > 0 ? keyValueTable[(lastIndex<<keyIndexShift)+1] : DUMMY_VALUE);
         }
     }
 
@@ -933,8 +933,8 @@ public class FastHashMap<K,V>
 
         // Write out keys and values (alternating)
         for (int i = iterateFirst(); i >= 0; i = iterateNext(i)) {
-            s.writeObject(myKeyValues[i<<keyShift]);
-            s.writeObject(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : null);
+            s.writeObject(keyValueTable[i<<keyIndexShift]);
+            s.writeObject(keyIndexShift > 0 ? keyValueTable[(i<<keyIndexShift)+1] : null);
         }
     }
 
@@ -952,9 +952,9 @@ public class FastHashMap<K,V>
 
         // Read in number of buckets and allocate the bucket array;
         hashLen = s.readInt();
-        keyShift = 1;
-        myKeyValues = new Object[threshold<<keyShift];
-        myIndices = new int[hashLen+threshold];
+        keyIndexShift = 1;
+        keyValueTable = new Object[threshold<<keyIndexShift];
+        indexTable = new int[hashLen+threshold];
         firstDeletedIndex = -1;
 
         init();  // Give subclass a chance to do its thing.
@@ -980,15 +980,15 @@ public class FastHashMap<K,V>
             this.index = index;
         }
         public final K getKey() {
-            return (K)myKeyValues[index<<keyShift];
+            return (K)keyValueTable[index<<keyIndexShift];
         }
         public final V getValue() {
-            return (V)(keyShift > 0 ? myKeyValues[(index<<keyShift)+1] : DUMMY_VALUE);
+            return (V)(keyIndexShift > 0 ? keyValueTable[(index<<keyIndexShift)+1] : DUMMY_VALUE);
         }
         public final V setValue(V newValue) {
-            if(keyShift == 0) throw new UnsupportedOperationException();
-            V oldValue = (V)myKeyValues[(index<<keyShift)+1];
-            myKeyValues[(index<<keyShift)+1] = newValue;
+            if(keyIndexShift == 0) throw new UnsupportedOperationException();
+            V oldValue = (V)keyValueTable[(index<<keyIndexShift)+1];
+            keyValueTable[(index<<keyIndexShift)+1] = newValue;
             updateHook(index);
             return oldValue;
         }

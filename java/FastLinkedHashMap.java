@@ -252,7 +252,7 @@ public class FastLinkedHashMap<K,V>
         int i = positionOf(key);
         if(i < 0) return null;
         updateIndex(i);
-        return (V)(keyShift > 0 ? myKeyValues[(i<<keyShift)+1] : DUMMY_VALUE);
+        return (V)(keyIndexShift > 0 ? keyValueTable[(i<<keyIndexShift)+1] : DUMMY_VALUE);
     }
 
     /**
