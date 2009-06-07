@@ -686,16 +686,16 @@ public class FastHashMap<K,V>
      * @throws NullPointerException if the specified map is null
      */
     public void putAll(Map<? extends K, ? extends V> m) {
-        int maxPossibleSize = size + m.size();
-        if (maxPossibleSize == size)
+        int mSize = m.size();
+        if (mSize == 0)
             return;
-        if (maxPossibleSize > threshold) {
+        if (mSize > threshold) {
             int newCapacity = hashLen;
             int newThreshold;
             do {
                 newCapacity <<= 1;
                 newThreshold = (int)(newCapacity * loadFactor);
-            } while (newThreshold < maxPossibleSize);
+            } while (newThreshold < mSize);
             resize(newCapacity);
         }
         for (Map.Entry<? extends K, ? extends V> e : m.entrySet())
