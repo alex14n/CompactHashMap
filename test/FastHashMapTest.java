@@ -512,4 +512,19 @@ public class FastHashMapTest {
       assertFalse(iv.hasNext());
     }
   }
+
+  @Test public void testBigResize () {
+    Map<Integer,String> m1 = new FastHashMap<Integer,String>();
+    Map<Integer,String> m2 = new FastHashMap<Integer,String>();
+    Map<Integer,String> m3 = new FastHashMap<Integer,String>();
+    for(int i = 0; i < 16; i++)
+      m1.put(i<<16, ""+i);
+    for(int i = 0; i < 400; i++)
+      m2.put(i, ""+i);
+    m3.putAll(m1);
+    m3.putAll(m2);
+    m2.putAll(m1);
+    assertEquals(m2, m3);
+    assertEquals(m3, m2);
+  }
 }

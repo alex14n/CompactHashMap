@@ -266,10 +266,10 @@ public class FastLinkedHashMap<K,V>
     }
 
     /**
-     * Increase size of internal arrays two times.
+     * Increase size of internal arrays.
      */
-    void resize() {
-        super.resize();
+    void resize(int newCapacity) {
+        super.resize(newCapacity);
         beforeAfter = Arrays.copyOf(beforeAfter, threshold<<1);
     }
 

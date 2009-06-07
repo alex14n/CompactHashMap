@@ -350,15 +350,18 @@ public class FastHashMap<K,V>
     }
 
     /**
-     * Increase size of internal arrays two times.
+     * Increase size of internal arrays.
+     *
+     * @param  newCapacity  must be power of two
+     * and greater than current capacity (hashLen).
      */
-    void resize() {
-        int newHashLen = hashLen << 1;
-        int newValueLen = (int)(newHashLen * loadFactor);
-        Object[] newKeyValues = Arrays.copyOf(keyValueTable,newValueLen<<keyIndexShift);
-        int[] newIndices = new int[newHashLen+newValueLen];
+    void resize(int newCapacity) {
+        int newValueLen = (int)(newCapacity * loadFactor);
+        Object[] newKeyValues = Arrays.copyOf(keyValueTable, newValueLen<<keyIndexShift);
+        int[] newIndices = new int[newCapacity+newValueLen];
         int mask = AVAILABLE_BITS ^ (hashLen-1);
-        int newMask = AVAILABLE_BITS ^ (newHashLen-1);
+        int newMask = AVAILABLE_BITS ^ (newCapacity-1);
+        boolean fastResize = newCapacity <= (hashLen<<1);
         for (int i = 0; i < hashLen; i++) {
             int next1 = 0;
             int next2 = 0;
@@ -366,23 +369,36 @@ public class FastHashMap<K,V>
             for (int j = ~indexTable[i]; j >= 0; j = ~indexTable[hashLen + arrayIndex]) {
                 arrayIndex = j & (hashLen-1);
                 int newHashIndex = i | (j & (newMask ^ mask));
-                // Each old element from the old hash basket may go
-                // either to the same basket in increased hash table
-                // (if new highest bit is zero)
-                // or to (i + hashLen) if new highest bit is 1.
-                if (newHashIndex == i) {
-                    if (next1 < 0) newIndices[newHashLen + arrayIndex] = next1;
-                    next1 = ~(arrayIndex | (j & newMask) | (next1 < 0 ? 0 : END_OF_LIST));
+                if (fastResize) {
+                    // Each old element from the old hash basket may go
+                    // either to the same basket in increased hash table
+                    // (if new highest bit is zero)
+                    // or to (i + hashLen) if new highest bit is 1.
+                    if (newHashIndex == i) {
+                        if (next1 < 0)
+                            newIndices[newCapacity + arrayIndex] = next1;
+                        next1 = ~(arrayIndex | (j & newMask) |
+                            (next1 < 0 ? 0 : END_OF_LIST));
+                    } else {
+                        if (next2 < 0)
+                            newIndices[newCapacity + arrayIndex] = next2;
+                        next2 = ~(arrayIndex | (j & newMask) |
+                            (next2 < 0 ? 0 : END_OF_LIST));
+                    }
                 } else {
-                    if (next2 < 0) newIndices[newHashLen + arrayIndex] = next2;
-                    next2 = ~(arrayIndex | (j & newMask) | (next2 < 0 ? 0 : END_OF_LIST));
+                    int oldIndex = newIndices[newHashIndex];
+                    if (oldIndex < 0)
+                        newIndices[newCapacity + arrayIndex] = oldIndex;
+                    int newIndex = ~(arrayIndex | (j & newMask) |
+                        (oldIndex < 0 ? 0 : END_OF_LIST));
+                    newIndices[newHashIndex] = newIndex;
                 }
                 if ((j & END_OF_LIST) != 0) break;
             }
             if (next1 < 0) newIndices[i] = next1;
             if (next2 < 0) newIndices[i + hashLen] = next2;
         }
-        hashLen = newHashLen;
+        hashLen = newCapacity;
         threshold = newValueLen;
         keyValueTable = newKeyValues;
         indexTable = newIndices;
@@ -472,7 +488,7 @@ public class FastHashMap<K,V>
         }
         // Resize if needed
         if (size >= threshold) {
-            resize();
+            resize(hashLen<<1);
             i = hc & (hashLen - 1);
             mask = AVAILABLE_BITS ^ (hashLen-1);
             hcBits = hc & mask;
@@ -670,7 +686,18 @@ public class FastHashMap<K,V>
      * @throws NullPointerException if the specified map is null
      */
     public void putAll(Map<? extends K, ? extends V> m) {
-        // ToDo: resize if needed
+        int maxPossibleSize = size + m.size();
+        if (maxPossibleSize == size)
+            return;
+        if (maxPossibleSize > threshold) {
+            int newCapacity = hashLen;
+            int newThreshold;
+            do {
+                newCapacity <<= 1;
+                newThreshold = (int)(newCapacity * loadFactor);
+            } while (newThreshold < maxPossibleSize);
+            resize(newCapacity);
+        }
         for (Map.Entry<? extends K, ? extends V> e : m.entrySet())
             put(e.getKey(), e.getValue());
     }
