@@ -972,47 +972,56 @@ public class FastHashMap<K,V>
         }
     }
 
-    // ToDo: check modCount and throw IllegalStateException?
-    @SuppressWarnings("unchecked")
     final class Entry implements Map.Entry<K,V> {
-        private final int index;
+        final int index;
+        final K key;
+        V value;
+        @SuppressWarnings("unchecked")
         Entry(int index) {
             this.index = index;
+            this.key = (K)keyValueTable[index<<keyIndexShift];
+            this.value = (V)(keyIndexShift > 0 ?
+                keyValueTable[(index<<keyIndexShift)+1] :
+                DUMMY_VALUE);
         }
         public final K getKey() {
-            return (K)keyValueTable[index<<keyIndexShift];
+            return key;
         }
+        @SuppressWarnings("unchecked")
         public final V getValue() {
-            return (V)(keyIndexShift > 0 ? keyValueTable[(index<<keyIndexShift)+1] : DUMMY_VALUE);
+            if(keyIndexShift > 0 && keyValueTable[index<<keyIndexShift] == key)
+                value = (V)keyValueTable[(index<<keyIndexShift)+1];
+            return value;
         }
         public final V setValue(V newValue) {
-            if(keyIndexShift == 0) throw new UnsupportedOperationException();
-            V oldValue = (V)keyValueTable[(index<<keyIndexShift)+1];
-            keyValueTable[(index<<keyIndexShift)+1] = newValue;
-            updateHook(index);
+            if(keyIndexShift > 0 && keyValueTable[index<<keyIndexShift] == key) {
+                @SuppressWarnings("unchecked")
+                V oldValue = (V)keyValueTable[(index<<keyIndexShift)+1];
+                keyValueTable[(index<<keyIndexShift)+1] = newValue;
+                return oldValue;
+            }
+            V oldValue = value;
+            value = newValue;
             return oldValue;
         }
         public boolean equals(Object o) {
             if (!(o instanceof Map.Entry))
                 return false;
+            @SuppressWarnings("unchecked")
             Map.Entry<K,V> that = (Map.Entry<K,V>)o;
-            K key1 = this.getKey();
             K key2 = that.getKey();
-            if(key1 == key2 || (key1 != null && key1.equals(key2))) {
-                V value1 = this.getValue();
+            if(key == key2 || (key != null && key.equals(key2))) {
                 V value2 = that.getValue();
-                return value1 == value2 || (value1 != null && value1.equals(value2));
+                return getValue() == value2 || (value != null && value.equals(value2));
             }
             return false;
         }
         public int hashCode() {
-            K key = getKey();
-            V value = getValue();
-            return (key   == null ? 0 :   key.hashCode()) ^
-                   (value == null ? 0 : value.hashCode());
+            return (key     == null ? 0 :   key.hashCode()) ^
+                (getValue() == null ? 0 : value.hashCode());
         }
         public String toString() {
-            return getKey() + "=" + getValue();
+            return key + "=" + getValue();
         }
     }
 

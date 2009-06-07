@@ -60,7 +60,7 @@ public class FastLinkedHashMapTest {
       HeadEntryTester that = (HeadEntryTester)super.clone();
       that.lastValue = null;
       return that;
-  }
+    }
   }
 
   @Test public void testHeadEntry () {

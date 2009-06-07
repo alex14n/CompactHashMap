@@ -436,4 +436,80 @@ public class FastHashMapTest {
     assertEquals(new Integer(7), e.getKey());
     assertEquals(new Integer(49), e.getValue());
   }
+
+  //
+
+  @Test public void testRemovedEntry () {
+    Map<String,String> m = new FastHashMap<String,String>();
+    assertEquals(null, m.put("1", "2"));
+    Map.Entry<String,String> e = m.entrySet().iterator().next();
+    assertEquals("2", e.setValue("3"));
+    assertEquals("3", m.put("1", "4"));
+    assertEquals("1=4", e.toString());
+    assertEquals("4", m.put("1", "5"));
+    assertEquals("1".hashCode() ^ "5".hashCode(), e.hashCode());
+    assertEquals("5", m.put("1", "6"));
+    Map.Entry<String,String> e2;
+    e2 = new AbstractMap.SimpleImmutableEntry<String,String>("1", "6");
+    assertEquals(e, e2);
+    assertEquals("6", m.put("1", "7"));
+    e2 = new AbstractMap.SimpleImmutableEntry<String,String>("1", "7");
+    assertEquals(e2, e);
+    assertEquals("7", m.remove("1"));
+    assertEquals(null, m.put("a", "b"));
+    assertEquals("1", e.getKey());
+    assertEquals("7", e.getValue());
+    assertEquals("7", e.setValue("8"));
+    assertEquals("b", m.get("a"));
+    assertEquals("8", e.getValue());
+  }
+
+  static class ZeroHash {
+    int n;
+    ZeroHash(int n) { this.n = n; }
+    public int hashCode() { return 0; }
+    public boolean equals(Object o) {
+      return o instanceof ZeroHash ? ((ZeroHash)o).n == n : false;
+    }
+    public String toString() { return "ZeroHash("+n+")"; }
+  }
+  @Test public void testOneBasket () {
+    Map<ZeroHash,String> m = new FastHashMap<ZeroHash,String>();
+    int n = 6;
+    for (int i = 0; i < (1<<n); i++) {
+      m.clear();
+      for(int j = 0; j < n; j++)
+        m.put(new ZeroHash(j), ""+j);
+      int size = n;
+      for(int j = 0; j < n; j++)
+        if((i & (1<<j)) == 0) {
+          m.remove(new ZeroHash(j));
+          size--;
+        }
+      assertEquals(size, m.size());
+      for(int j = 0; j < n; j++)
+        assertEquals((i & (1<<j)) != 0, m.containsKey(new ZeroHash(j)));
+      //
+      Iterator<ZeroHash> ik = m.keySet().iterator();
+      for(int j = 0; j < n; j++)
+        if((i & (1<<j)) != 0)
+          assertEquals(j, ik.next().n);
+      assertFalse(ik.hasNext());
+      //
+      Iterator<Map.Entry<ZeroHash,String>> ie = m.entrySet().iterator();
+      for(int j = 0; j < n; j++)
+        if((i & (1<<j)) != 0) {
+          Map.Entry<ZeroHash,String> e = ie.next();
+          assertEquals(j, e.getKey().n);
+          assertEquals(""+j, e.getValue());
+        }
+      assertFalse(ie.hasNext());
+      //
+      Iterator<String> iv = m.values().iterator();
+      for(int j = 0; j < n; j++)
+        if((i & (1<<j)) != 0)
+          assertEquals(""+j, iv.next());
+      assertFalse(iv.hasNext());
+    }
+  }
 }

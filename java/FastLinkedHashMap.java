@@ -149,7 +149,7 @@ public class FastLinkedHashMap<K,V>
      * Cached Entry of the eldest map element
      * for removeEldestEntry speedup.
      */
-    private transient Map.Entry<K,V> headEntry;
+    private transient Entry headEntry;
 
     /**
      * Constructs an empty insertion-ordered <tt>LinkedHashMap</tt> instance
@@ -377,8 +377,12 @@ public class FastLinkedHashMap<K,V>
      * Here we move its index to the end of linked list
      * if accessOrder is true and update cached HeadEntry.
      */
+    @SuppressWarnings("unchecked")
     void updateHook(int i) {
         updateIndex(i);
+        if(headEntry != null && headIndex == i && keyIndexShift > 0)
+          headEntry.value = (V)keyValueTable[(i<<keyIndexShift)+1];
+
     }
 
     // Iteration order based on the linked list.
