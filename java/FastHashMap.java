@@ -361,7 +361,6 @@ public class FastHashMap<K,V>
         int[] newIndices = new int[newCapacity+newValueLen];
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int newMask = AVAILABLE_BITS ^ (newCapacity-1);
-        boolean fastResize = newCapacity <= (hashLen<<1);
         for (int i = 0; i < hashLen; i++) {
             int next1 = 0;
             int next2 = 0;
@@ -369,22 +368,16 @@ public class FastHashMap<K,V>
             for (int j = ~indexTable[i]; j >= 0; j = ~indexTable[hashLen + arrayIndex]) {
                 arrayIndex = j & (hashLen-1);
                 int newHashIndex = i | (j & (newMask ^ mask));
-                if (fastResize) {
-                    // Each old element from the old hash basket may go
-                    // either to the same basket in increased hash table
-                    // (if new highest bit is zero)
-                    // or to (i + hashLen) if new highest bit is 1.
-                    if (newHashIndex == i) {
-                        if (next1 < 0)
-                            newIndices[newCapacity + arrayIndex] = next1;
-                        next1 = ~(arrayIndex | (j & newMask) |
-                            (next1 < 0 ? 0 : END_OF_LIST));
-                    } else {
-                        if (next2 < 0)
-                            newIndices[newCapacity + arrayIndex] = next2;
-                        next2 = ~(arrayIndex | (j & newMask) |
-                            (next2 < 0 ? 0 : END_OF_LIST));
-                    }
+                if (newHashIndex == i) {
+                    if (next1 < 0)
+                        newIndices[newCapacity + arrayIndex] = next1;
+                    next1 = ~(arrayIndex | (j & newMask) |
+                        (next1 < 0 ? 0 : END_OF_LIST));
+                } else if (newHashIndex == i+hashLen) {
+                    if (next2 < 0)
+                        newIndices[newCapacity + arrayIndex] = next2;
+                    next2 = ~(arrayIndex | (j & newMask) |
+                        (next2 < 0 ? 0 : END_OF_LIST));
                 } else {
                     int oldIndex = newIndices[newHashIndex];
                     if (oldIndex < 0)
