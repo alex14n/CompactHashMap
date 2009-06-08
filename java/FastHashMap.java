@@ -430,7 +430,9 @@ public class FastHashMap<K,V>
      * @return <tt>true</tt> if i-th is empty (was deleted)
      */
     final private boolean isEmpty(int i) {
-        return /* i >= firstEmptyIndex || */ i == firstDeletedIndex || indexTable[hashLen+i] > 0;
+        return /* i >= firstEmptyIndex || */
+            i == firstDeletedIndex ||
+            (firstDeletedIndex >= 0 && indexTable[hashLen+i] > 0);
     }
 
     /**
@@ -718,7 +720,8 @@ public class FastHashMap<K,V>
      *         specified value
      */
     public boolean containsValue(Object value) {
-        if (keyIndexShift == 0) return size > 0 && value == DUMMY_VALUE;
+        if (keyIndexShift == 0)
+            return size > 0 && value == DUMMY_VALUE;
         for (int i = 0; i < firstEmptyIndex ; i++)
             if (!isEmpty(i)) { // Not deleted
                 Object o = keyValueTable[(i<<keyIndexShift)+1];
