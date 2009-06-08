@@ -447,4 +447,32 @@ public class FastLinkedHashMap<K,V>
             modCount++;
         }
     }
+
+    /**
+     * Internal self-test.
+     */
+    void validate() {
+        super.validate();
+        if (size == 0) {
+            if (headIndex != -1)
+                throw new RuntimeException("headIndex("+headIndex+") must be -1 in empty map");
+            if (headEntry != null)
+                throw new RuntimeException("headEntry must be null in empty map");
+        } else {
+            if (headEntry != null && headEntry.index != headIndex)
+                throw new RuntimeException("headEntry("+headEntry.index+") must be "+headIndex);
+            if (headEntry != null && headEntry.key != keyValueTable[headIndex<<keyIndexShift])
+                throw new RuntimeException("headEntry.key("+headEntry.key+") is incorrect");
+            int numberOfEntries = 0;
+            int next = -1;
+            for (int i = headIndex; next != headIndex; i = next) {
+                numberOfEntries++;
+                next = beforeAfter[(i<<1)+1];
+                if (beforeAfter[next<<1] != i)
+                    throw new RuntimeException("next("+next+").before("+beforeAfter[next<<1]+") != this("+i+")");
+            }
+            if (numberOfEntries != size)
+                throw new RuntimeException("numberOfEntries("+numberOfEntries+") != size("+size+")");
+        }
+    }
 }

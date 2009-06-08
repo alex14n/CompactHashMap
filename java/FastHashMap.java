@@ -1053,4 +1053,44 @@ public class FastHashMap<K,V>
     void addHook(int i) { }
     void updateHook(int i) { }
     void removeHook(int i) { }
+
+    /**
+     * Internal self-test.
+     */
+    void validate() {
+        int numberOfKeys = 0;
+        for (int i = 0; i < hashLen; i++) {
+            int index = ~indexTable[i];
+            while (index >= 0) {
+                Object key = keyValueTable[(index & (hashLen-1))<<keyIndexShift];
+                int hc = hash(key);
+                if ((hc & (hashLen-1)) != i)
+                    throw new RuntimeException("Key "+key+" is in wrong hash basket ("+
+                        i+") must be "+(hc & (hashLen-1)));
+                int mask = AVAILABLE_BITS ^ (hashLen-1);
+                if ((hc & mask) != (index & mask))
+                    throw new RuntimeException("Key "+key+" has incorrect hashcode bits");
+                numberOfKeys++;
+                if ((index & END_OF_LIST) != 0) break;
+                index = ~indexTable[hashLen+(index & (hashLen-1))];
+                if (index < 0)
+                    throw new RuntimeException("END_OF_LIST bit not set in basket "+i);
+            }
+        }
+        if (numberOfKeys != size)
+            throw new RuntimeException("Size("+size+") != # of keys("+numberOfKeys+")");
+        int numberOfDeletedIndices = 0;
+        int i = firstDeletedIndex;
+        while (i >= 0) {
+            numberOfDeletedIndices++;
+            int nextDeleted = indexTable[hashLen+i];
+            if (nextDeleted == END_OF_LIST) break;
+            if (nextDeleted < 1)
+                throw new RuntimeException("Incorrect entry in deleted list ("+nextDeleted+")");
+            i = nextDeleted-1;
+        }
+        if (numberOfDeletedIndices != firstEmptyIndex - size)
+            throw new RuntimeException("Deleted # ("+numberOfDeletedIndices+
+                ") must be "+(firstEmptyIndex - size));
+    }
 }
