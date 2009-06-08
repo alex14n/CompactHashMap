@@ -43,6 +43,9 @@ class CompactHashSetTest {
     set += 0
     val set3 = Set() ++ set.elements
     assertEquals (Set(0,1,2,3), set3)
+    set -= 2
+    val set4 = Set() ++ set.elements
+    assertEquals (Set(0,1,3), set4)
   }
 
   @Test def testFixedDel {

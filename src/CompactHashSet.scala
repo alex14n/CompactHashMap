@@ -358,7 +358,7 @@ private abstract class FixedHashSet[T] (
     var newLen = ((1 << newBits) * loadFactor).asInstanceOf[Int]
     var i = 0
     while (i < firstEmptyIndex) {
-      if (!isEmpty(i) && f.check(array(i),i)) {
+      if ((firstDeletedIndex < 0 || !isEmpty(i)) && f.check(array(i),i)) {
         bitSet(i >>> 6) |= 1L << (i & 63)
         count += 1
         if (count > newLen) {
@@ -482,11 +482,11 @@ private abstract class FixedHashSet[T] (
   final def elements = new Iterator[T] {
     private[this] var i = 0
     def hasNext = {
-      while (i < firstEmptyIndex && isEmpty(i)) i += 1
+      while (i < firstEmptyIndex && (firstDeletedIndex >= 0 && isEmpty(i))) i += 1
       i < firstEmptyIndex
     }
     def next = {
-      while (i < firstEmptyIndex && isEmpty(i)) i += 1
+      while (i < firstEmptyIndex && (firstDeletedIndex >= 0 && isEmpty(i))) i += 1
       if (i < firstEmptyIndex) { i += 1; array(i-1) }
       else Iterator.empty.next
     }
@@ -497,11 +497,11 @@ private abstract class FixedHashSet[T] (
   final def elementsMap[F] (f: (T,Int) => F) = new Iterator[F] {
     private[this] var i = 0
     def hasNext = {
-      while (i < firstEmptyIndex && isEmpty(i)) i += 1
+      while (i < firstEmptyIndex && (firstDeletedIndex >= 0 && isEmpty(i))) i += 1
       i < firstEmptyIndex
     }
     def next = {
-      while (i < firstEmptyIndex && isEmpty(i)) i += 1
+      while (i < firstEmptyIndex && (firstDeletedIndex >= 0 && isEmpty(i))) i += 1
       if (i < firstEmptyIndex) { i += 1; f (array(i-1), i-1) }
       else Iterator.empty.next
     }
@@ -518,7 +518,7 @@ private abstract class FixedHashSet[T] (
     var i = firstEmptyIndex
     while (i > 0) {
       i -= 1
-      if (!isEmpty(i))
+      if (firstDeletedIndex < 0 || !isEmpty(i))
         list = array(i) :: list
     }
     list
@@ -531,7 +531,7 @@ private abstract class FixedHashSet[T] (
     var i = firstEmptyIndex
     while (i > 0) {
       i -= 1
-      if (!isEmpty(i))
+      if (firstDeletedIndex < 0 || !isEmpty(i))
         list = f(array(i),i) :: list
     }
     list
