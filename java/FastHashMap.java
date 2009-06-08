@@ -690,8 +690,23 @@ public class FastHashMap<K,V>
             } while (newThreshold < mSize);
             resize(newCapacity);
         }
-        for (Map.Entry<? extends K, ? extends V> e : m.entrySet())
-            put(e.getKey(), e.getValue());
+        if (m instanceof FastHashMap) {
+            @SuppressWarnings("unchecked")
+            FastHashMap<K,V> fm = (FastHashMap<K,V>)m;
+            for (int i = 0; i < fm.firstEmptyIndex; i++)
+                if (!fm.isEmpty(i)) {
+                    @SuppressWarnings("unchecked")
+                    K key = (K)fm.keyValueTable[i<<fm.keyIndexShift];
+                    @SuppressWarnings("unchecked")
+                    V value = (V)(fm.keyIndexShift > 0 ?
+                        fm.keyValueTable[(i<<fm.keyIndexShift)+1] :
+                        DUMMY_VALUE);
+                    put(key, value);
+                }
+        } else {
+            for (Map.Entry<? extends K, ? extends V> e : m.entrySet())
+                put(e.getKey(), e.getValue());
+        }
     }
 
     /**
@@ -863,7 +878,9 @@ public class FastHashMap<K,V>
             Map.Entry<K,V> e = (Map.Entry<K,V>) o;
             int i = positionOf(e.getKey());
             if (i < 0) return false;
-            Object v1 = keyIndexShift > 0 ? keyValueTable[(i<<keyIndexShift)+1] : DUMMY_VALUE;
+            Object v1 = keyIndexShift > 0 ?
+                keyValueTable[(i<<keyIndexShift)+1] :
+                DUMMY_VALUE;
             Object v2 = e.getValue();
             return v1 == v2 || v1 != null && v1.equals(v2);
         }
