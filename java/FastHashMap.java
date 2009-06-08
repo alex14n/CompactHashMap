@@ -97,7 +97,6 @@ import java.io.*;
  * @since   1.2
  */
 public class FastHashMap<K,V>
-    extends AbstractMap<K,V>
     implements Cloneable, Serializable, Map<K,V>
 {
     /**
@@ -155,7 +154,7 @@ public class FastHashMap<K,V>
      * Return improved hash for object o.
      */
     final static int hash(Object o) {
-        return hash(o == null ? 0 : o.hashCode());
+        return o == null ? 0 : hash(o.hashCode());
     }
 
     /**
@@ -1092,5 +1091,121 @@ public class FastHashMap<K,V>
         if (numberOfDeletedIndices != firstEmptyIndex - size)
             throw new RuntimeException("Deleted # ("+numberOfDeletedIndices+
                 ") must be "+(firstEmptyIndex - size));
+    }
+
+    /**
+     * Returns the hash code value for this map.  The hash code of a map is
+     * defined to be the sum of the hash codes of each entry in the map's
+     * <tt>entrySet()</tt> view.  This ensures that <tt>m1.equals(m2)</tt>
+     * implies that <tt>m1.hashCode()==m2.hashCode()</tt> for any two maps
+     * <tt>m1</tt> and <tt>m2</tt>, as required by the general contract of
+     * {@link Object#hashCode}.
+     *
+     * <p>This implementation iterates over <tt>entrySet()</tt>, calling
+     * {@link Map.Entry#hashCode hashCode()} on each element (entry) in the
+     * set, and adding up the results.
+     *
+     * @return the hash code value for this map
+     * @see Map.Entry#hashCode()
+     * @see Object#equals(Object)
+     * @see Set#equals(Object)
+     */
+    public int hashCode() {
+        int h = 0;
+        for (int i = 0; i < firstEmptyIndex; i++)
+            if (!isEmpty(i)) {
+                Object key = keyValueTable[i<<keyIndexShift];
+                Object value = keyIndexShift > 0 ?
+                    keyValueTable[(i<<keyIndexShift)+1] :
+                    DUMMY_VALUE;
+                int hc = 0;
+                if (key != null) hc ^= key.hashCode();
+                if (value != null) hc ^= value.hashCode();
+                h += hc;
+            }
+        return h;
+    }
+
+    /**
+     * Returns a string representation of this map.  The string representation
+     * consists of a list of key-value mappings in the order returned by the
+     * map's <tt>entrySet</tt> view's iterator, enclosed in braces
+     * (<tt>"{}"</tt>).  Adjacent mappings are separated by the characters
+     * <tt>", "</tt> (comma and space).  Each key-value mapping is rendered as
+     * the key followed by an equals sign (<tt>"="</tt>) followed by the
+     * associated value.  Keys and values are converted to strings as by
+     * {@link String#valueOf(Object)}.
+     *
+     * @return a string representation of this map
+     */
+    public String toString() {
+        if (size == 0)
+            return "{}";
+        StringBuilder sb = new StringBuilder();
+        sb.append('{');
+        boolean first = true;
+        for (int i = 0; i < firstEmptyIndex; i++)
+            if (!isEmpty(i)) {
+                if (first)
+                    first = false;
+                else
+                    sb.append(", ");
+                Object key = keyValueTable[i<<keyIndexShift];
+                Object value = keyIndexShift > 0 ?
+                    keyValueTable[(i<<keyIndexShift)+1] :
+                    DUMMY_VALUE;
+                sb.append(key   == this ? "(this Map)" : key);
+                sb.append('=');
+                sb.append(value == this ? "(this Map)" : value);
+            }
+        return sb.append('}').toString();
+    }
+
+    /**
+     * Compares the specified object with this map for equality.  Returns
+     * <tt>true</tt> if the given object is also a map and the two maps
+     * represent the same mappings.  More formally, two maps <tt>m1</tt> and
+     * <tt>m2</tt> represent the same mappings if
+     * <tt>m1.entrySet().equals(m2.entrySet())</tt>.  This ensures that the
+     * <tt>equals</tt> method works properly across different implementations
+     * of the <tt>Map</tt> interface.
+     *
+     * <p>This implementation first checks if the specified object is this map;
+     * if so it returns <tt>true</tt>.  Then, it checks if the specified
+     * object is a map whose size is identical to the size of this map; if
+     * not, it returns <tt>false</tt>.  If so, it iterates over this map's
+     * <tt>entrySet</tt> collection, and checks that the specified map
+     * contains each mapping that this map contains.  If the specified map
+     * fails to contain such a mapping, <tt>false</tt> is returned.  If the
+     * iteration completes, <tt>true</tt> is returned.
+     *
+     * @param o object to be compared for equality with this map
+     * @return <tt>true</tt> if the specified object is equal to this map
+     */
+    public boolean equals(Object o) {
+        if (o == this)
+            return true;
+        if (!(o instanceof Map))
+            return false;
+        @SuppressWarnings("unchecked")
+        Map<K,V> m = (Map<K,V>) o;
+        if (m.size() != size)
+            return false;
+        for (int i = 0; i < firstEmptyIndex; i++)
+            if (!isEmpty(i)) {
+                Object key = keyValueTable[i<<keyIndexShift];
+                Object value = keyIndexShift > 0 ?
+                    keyValueTable[(i<<keyIndexShift)+1] :
+                    DUMMY_VALUE;
+                if (value == null) {
+                    if (!(m.get(key)==null && m.containsKey(key)))
+                        return false;
+                } else {
+                    Object value2 = m.get(key);
+                    if (value != value2 && !value.equals(value2))
+                        return false;
+                }
+            }
+        return true;
     }
 }
