@@ -430,9 +430,8 @@ public class FastHashMap<K,V>
      * @return <tt>true</tt> if i-th is empty (was deleted)
      */
     final private boolean isEmpty(int i) {
-        return /* i >= firstEmptyIndex || */
-            i == firstDeletedIndex ||
-            (firstDeletedIndex >= 0 && indexTable[hashLen+i] > 0);
+        return firstDeletedIndex >= 0 &&
+            (i == firstDeletedIndex || indexTable[hashLen+i] > 0);
     }
 
     /**
@@ -1075,7 +1074,6 @@ public class FastHashMap<K,V>
 
     /**
      * Internal self-test.
-     */
     void validate() {
         int numberOfKeys = 0;
         for (int i = 0; i < hashLen; i++) {
@@ -1112,6 +1110,7 @@ public class FastHashMap<K,V>
             throw new RuntimeException("Deleted # ("+numberOfDeletedIndices+
                 ") must be "+(firstEmptyIndex - size));
     }
+     */
 
     /**
      * Returns the hash code value for this map.  The hash code of a map is

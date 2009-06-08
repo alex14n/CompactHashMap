@@ -450,7 +450,6 @@ public class FastLinkedHashMap<K,V>
 
     /**
      * Internal self-test.
-     */
     void validate() {
         super.validate();
         if (size == 0) {
@@ -475,4 +474,5 @@ public class FastLinkedHashMap<K,V>
                 throw new RuntimeException("numberOfEntries("+numberOfEntries+") != size("+size+")");
         }
     }
+     */
 }
