@@ -147,15 +147,15 @@ public class FastHashMap<K,V>
         // This function ensures that hashCodes that differ only by
         // constant multiples at each bit position have a bounded
         // number of collisions (approximately 8 at default load factor).
-        return (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h;
+        h ^= (h >>> 20) ^ (h >>> 12);
+        return h ^ (h >>> 7) ^ (h >>> 4);
     }
 
     /**
      * Return improved hash for object o.
      */
     final static int hash(Object o) {
-        int h = o == null ? 0 : o.hashCode();
-        return (h >>> 20) ^ (h >>> 12) ^ (h >>> 7) ^ (h >>> 4) ^ h;
+        return hash(o == null ? 0 : o.hashCode());
     }
 
     /**
