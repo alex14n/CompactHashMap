@@ -694,16 +694,15 @@ public class FastHashMap<K,V>
         if (m instanceof FastHashMap) {
             @SuppressWarnings("unchecked")
             FastHashMap<K,V> fm = (FastHashMap<K,V>)m;
-            for (int i = 0; i < fm.firstEmptyIndex; i++)
-                if (!fm.isEmpty(i)) {
-                    @SuppressWarnings("unchecked")
-                    K key = (K)fm.keyValueTable[i<<fm.keyIndexShift];
-                    @SuppressWarnings("unchecked")
-                    V value = (V)(fm.keyIndexShift > 0 ?
-                        fm.keyValueTable[(i<<fm.keyIndexShift)+1] :
-                        DUMMY_VALUE);
-                    put(key, value);
-                }
+            for (int i = fm.iterateFirst(); i >= 0; i = fm.iterateNext(i)) {
+                @SuppressWarnings("unchecked")
+                K key = (K)fm.keyValueTable[i<<fm.keyIndexShift];
+                @SuppressWarnings("unchecked")
+                V value = (V)(fm.keyIndexShift > 0 ?
+                    fm.keyValueTable[(i<<fm.keyIndexShift)+1] :
+                    DUMMY_VALUE);
+                put(key, value);
+            }
         } else {
             for (Map.Entry<? extends K, ? extends V> e : m.entrySet())
                 put(e.getKey(), e.getValue());
@@ -1163,20 +1162,19 @@ public class FastHashMap<K,V>
         StringBuilder sb = new StringBuilder();
         sb.append('{');
         boolean first = true;
-        for (int i = 0; i < firstEmptyIndex; i++)
-            if (!isEmpty(i)) {
-                if (first)
-                    first = false;
-                else
-                    sb.append(", ");
-                Object key = keyValueTable[i<<keyIndexShift];
-                Object value = keyIndexShift > 0 ?
-                    keyValueTable[(i<<keyIndexShift)+1] :
-                    DUMMY_VALUE;
-                sb.append(key   == this ? "(this Map)" : key);
-                sb.append('=');
-                sb.append(value == this ? "(this Map)" : value);
-            }
+        for (int i = iterateFirst(); i >= 0; i = iterateNext(i)) {
+            if (first)
+                first = false;
+            else
+                sb.append(", ");
+            Object key = keyValueTable[i<<keyIndexShift];
+            Object value = keyIndexShift > 0 ?
+                keyValueTable[(i<<keyIndexShift)+1] :
+                DUMMY_VALUE;
+            sb.append(key   == this ? "(this Map)" : key);
+            sb.append('=');
+            sb.append(value == this ? "(this Map)" : value);
+        }
         return sb.append('}').toString();
     }
 
