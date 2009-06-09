@@ -120,13 +120,13 @@ public class FastHashMap<K,V>
      * Now the highest (31st) bit (negative/inverted values) is used as deleted flag,
      * 30th bit is used to mark end of list, thus 30 bits are available.
      */
-    private final static int AVAILABLE_BITS = 0x3FFFFFFF;
+    final static int AVAILABLE_BITS = 0x3FFFFFFF;
 
     /**
      * Bit flag marking the end of list of elements with the same hashcode,
      * or end of deleted list.
      */
-    private final static int END_OF_LIST = 0x40000000;
+    final static int END_OF_LIST = 0x40000000;
 
     /**
      * The maximum capacity, used if a higher value is implicitly specified

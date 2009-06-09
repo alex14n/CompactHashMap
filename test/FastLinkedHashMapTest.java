@@ -284,6 +284,7 @@ public class FastLinkedHashMapTest {
     map1.put("2", "b");
     map1.remove("1");
     map1.put("3", "c");
+    assertEquals("{2=b, 3=c}", map1.toString());
     Map<String,String> map2 = new FastLinkedHashMap<String,String> ();
     map2.putAll(map1);
     Iterator<String> i = map2.keySet().iterator();

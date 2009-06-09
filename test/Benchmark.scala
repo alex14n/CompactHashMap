@@ -25,6 +25,7 @@ object Benchmark {
 */
   private[this] var scalaMap: scala.collection.mutable.Map[T,T] = _
   private[this] var compactMap: CompactHashMap[T,T] = _
+  private[this] var hybridMap: HybridHashMap[T,T] = _
   private[this] var javaMap: java.util.Map[T,T] = _
   private[this] var troveIntMap: gnu.trove.TIntIntHashMap = _
   private[this] var fastutilIntMap: it.unimi.dsi.fastutil.ints.Int2IntMap = _
@@ -63,6 +64,15 @@ object Benchmark {
     var i = 0
     while (i < iterations) {
       javaMap put (values(i), values(2*iterations-i))
+      i += 1
+    }
+  }
+
+  def hybridWrite () {
+    hybridMap = new HybridHashMap[T,T]
+    var i = 0
+    while (i < iterations) {
+      hybridMap put (values(i), values(2*iterations-i))
       i += 1
     }
   }
@@ -141,6 +151,24 @@ object Benchmark {
     javaMap = null
   }
 
+  def hybridReadFull {
+    var i = 0
+    while (i < iterations) {
+      val j = reoder(i)
+      assert (hybridMap.get(values(j)) == values(2*iterations-j))
+      i += 1
+    }
+  }
+
+  def hybridReadEmpty {
+    var i = iterations
+    while (i < 2*iterations) {
+      assert (! hybridMap.containsKey(values(i)))
+      i += 1
+    }
+    hybridMap = null
+  }
+
   def troveIntReadFull {
     var i = 0
     while (i < iterations) {
@@ -178,19 +206,22 @@ object Benchmark {
   }
 
   val tests: List[(String,()=>Unit)] = List(
+    "hybridWrite" -> hybridWrite _,
+    "hybridReadFull" -> hybridReadFull _,
+    "hybridReadEmpty" -> hybridReadEmpty _,
     "fastWrite" -> {() => javaWrite(new FastHashMap)},
     "fastReadFull" -> javaReadFull _,
     "fastReadEmpty" -> javaReadEmpty _,
     "javaWrite" -> {() => javaWrite(new java.util.HashMap)},
     "javaReadFull" -> javaReadFull _,
     "javaReadEmpty" -> javaReadEmpty _,
+/*
     "compactWrite" -> {() => scalaWrite (new CompactHashMap (classOf[T], classOf[T], 16, 0.75f))},
     "compactReadFull" -> scalaReadFull _,
     "compactReadEmpty" -> scalaReadEmpty _,
     "javolutionWrite" -> {() => javaWrite(new javolution.util.FastMap)},
     "javolutionReadFull" -> javaReadFull _,
     "javolutionReadEmpty" -> javaReadEmpty _,
-/*
     "scalaWrite" -> {() => scalaWrite (new scala.collection.mutable.HashMap)},
     "scalaReadFull" -> scalaReadFull _,
     "scalaReadEmpty" -> scalaReadEmpty _,
