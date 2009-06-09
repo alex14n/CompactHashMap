@@ -31,40 +31,43 @@ public class HybridHashMapTest {
     assertEquals("3", map.put("c", "z"));
   }
 
-  static class ZeroHash {
+  static class Hash1 {
     int n;
-    ZeroHash(int n) { this.n = n; }
+    Hash1(int n) { this.n = n; }
     public int hashCode() { return 1; }
     public boolean equals(Object o) {
-      return o instanceof ZeroHash ? ((ZeroHash)o).n == n : false;
+      return o instanceof Hash1 ? ((Hash1)o).n == n : false;
     }
-    public String toString() { return "ZeroHash("+n+")"; }
+    public String toString() { return "Hash1("+n+")"; }
   }
   @Test public void testOneBasket () {
-    HybridHashMap<ZeroHash,String> map = new HybridHashMap<ZeroHash,String>();
-    assertEquals(null, map.put(new ZeroHash(1), "1"));
-    assertEquals(null, map.put(new ZeroHash(2), "2"));
-    assertEquals(null, map.put(new ZeroHash(3), "3"));
-    assertEquals("3", map.get(new ZeroHash(3)));
-    assertEquals(null, map.put(new ZeroHash(4), "4"));
-    assertEquals("1", map.get(new ZeroHash(1)));
-    assertEquals("4", map.get(new ZeroHash(4)));
-    assertEquals(null, map.put(new ZeroHash(5), "5"));
-    assertEquals("5", map.get(new ZeroHash(5)));
-    assertEquals(null, map.put(new ZeroHash(6), "6"));
-    assertEquals("1", map.get(new ZeroHash(1)));
-    assertEquals("2", map.get(new ZeroHash(2)));
-    assertEquals("3", map.get(new ZeroHash(3)));
-    assertEquals("4", map.get(new ZeroHash(4)));
-    assertEquals("5", map.get(new ZeroHash(5)));
-    assertEquals("6", map.get(new ZeroHash(6)));
-    assertEquals("1", map.put(new ZeroHash(1), "x"));
-    assertEquals("2", map.put(new ZeroHash(2), "y"));
-    assertEquals("3", map.put(new ZeroHash(3), "z"));
-    assertEquals("4", map.put(new ZeroHash(4), "a"));
-    assertEquals("5", map.put(new ZeroHash(5), "b"));
-    assertEquals("x", map.get(new ZeroHash(1)));
-    assertEquals("y", map.get(new ZeroHash(2)));
-    assertEquals("z", map.get(new ZeroHash(3)));
+    HybridHashMap<Hash1,String> map = new HybridHashMap<Hash1,String>();
+    assertEquals(null, map.put(new Hash1(1), "1"));
+    assertEquals(1, map.size());
+    assertEquals(null, map.put(new Hash1(2), "2"));
+    assertEquals(2, map.size());
+    assertEquals(null, map.put(new Hash1(3), "3"));
+    assertEquals(3, map.size());
+    assertEquals("3", map.get(new Hash1(3)));
+    assertEquals(null, map.put(new Hash1(4), "4"));
+    assertEquals("1", map.get(new Hash1(1)));
+    assertEquals("4", map.get(new Hash1(4)));
+    assertEquals(null, map.put(new Hash1(5), "5"));
+    assertEquals("5", map.get(new Hash1(5)));
+    assertEquals(null, map.put(new Hash1(6), "6"));
+    assertEquals("1", map.get(new Hash1(1)));
+    assertEquals("2", map.get(new Hash1(2)));
+    assertEquals("3", map.get(new Hash1(3)));
+    assertEquals("4", map.get(new Hash1(4)));
+    assertEquals("5", map.get(new Hash1(5)));
+    assertEquals("6", map.get(new Hash1(6)));
+    assertEquals("1", map.put(new Hash1(1), "x"));
+    assertEquals("2", map.put(new Hash1(2), "y"));
+    assertEquals("3", map.put(new Hash1(3), "z"));
+    assertEquals("4", map.put(new Hash1(4), "a"));
+    assertEquals("5", map.put(new Hash1(5), "b"));
+    assertEquals("x", map.get(new Hash1(1)));
+    assertEquals("y", map.get(new Hash1(2)));
+    assertEquals("z", map.get(new Hash1(3)));
   }
 }
