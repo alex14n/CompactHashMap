@@ -102,7 +102,7 @@ public class FastHashMap<K,V>
     /**
      * The default initial capacity - MUST be a power of two.
      */
-    static final int DEFAULT_INITIAL_CAPACITY = 16;
+    static final int DEFAULT_INITIAL_CAPACITY = 4;
 
     /**
      * The load factor used when none specified in constructor.
