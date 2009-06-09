@@ -34,7 +34,6 @@ public class HybridHashMap<K,V>
     threshold = (int)(hashLen * loadFactor);
     headHash = new int [hashLen];
     keyValueNext = new Object [hashLen*3];
-    size = hasNullKey ? 1 : 0;
   }
 
   public HybridHashMap() {
@@ -60,7 +59,7 @@ public class HybridHashMap<K,V>
     }
     // Look for collisions
     Entry<K,V> entry = (Entry<K,V>)keyValueNext[index3+2];
-    while (entry != null) { 
+    while (entry != null) {
       if (entry.hc == hc && (entry.key == key || key.equals(entry.key))) {
         return entry.value;
       }
@@ -107,7 +106,7 @@ public class HybridHashMap<K,V>
     }
     // Look for collisions
     Entry<K,V> entry = (Entry<K,V>)keyValueNext[index3+2];
-    for (Entry<K,V> e = entry; e != null; e = e.next) { 
+    for (Entry<K,V> e = entry; e != null; e = e.next) {
       if (e.hc == hc && (e.key == key || key.equals(e.key))) {
         V oldValue = e.value;
         e.value = value;
@@ -130,21 +129,63 @@ public class HybridHashMap<K,V>
   }
 */
   void resize() {
-    // ToDo: optimize, current version is very slow
+    // ToDo: optimize
     Object[] oldTable = keyValueNext;
     int[] oldHash = headHash;
-    int len3 = (hashLen<<1)+hashLen;
+    int len = hashLen, len3 = (hashLen<<1)+hashLen;
     hashLen <<= 1;
     init();
-    for (int i = 0; i < len3; i+=3) {
-      K key = (K)oldTable[i];
+    for (int i = 0, i3 = 0; i < len; i++, i3 += 3) {
+      K key = (K)oldTable[i3];
       if (key != null) {
-        V value = (V)oldTable[i+1];
-        put (key, value);
-        Entry<K,V> entry = (Entry<K,V>)oldTable[i+2];
+        int hc = oldHash[i];
+        V value = (V)oldTable[i3+1];
+        int newIndex = hc & (hashLen-1);
+        int new3 = (newIndex<<1)+newIndex;
+        headHash[newIndex] = hc;
+        keyValueNext[new3] = key;
+        keyValueNext[new3+1] = value;
+        //
+        boolean set1 = newIndex == i, set2 = newIndex == i+len;
+        Entry<K,V> entry = (Entry<K,V>)oldTable[i3+2],
+          next1 = null, next2 = null;
         while (entry != null) {
-          put (entry.key, entry.value);
-          entry = entry.next;
+          newIndex = entry.hc & (hashLen-1);
+          new3 = (newIndex<<1)+newIndex;
+          Entry<K,V> next = entry.next;
+          if (newIndex == i) {
+            if (set1) {
+              entry.next = next1;
+              next1 = entry;
+            } else {
+              headHash[newIndex] = entry.hc;
+              keyValueNext[new3] = entry.key;
+              keyValueNext[new3+1] = entry.value;
+              set1 = true;
+            }
+          } else if (newIndex == i+len) {
+            if (set2) {
+              entry.next = next2;
+              next2 = entry;
+            } else {
+              headHash[newIndex] = entry.hc;
+              keyValueNext[new3] = entry.key;
+              keyValueNext[new3+1] = entry.value;
+              set2 = true;
+            }
+          } else {
+            if (keyValueNext[new3] != null) {
+              entry.next = (Entry<K,V>)keyValueNext[new3+2];
+              keyValueNext[new3+2] = entry;
+            } else {
+              headHash[newIndex] = entry.hc;
+              keyValueNext[new3] = entry.key;
+              keyValueNext[new3+1] = entry.value;
+            }
+          }
+          if (next1 != null) keyValueNext[i3+2] = next1;
+          if (next2 != null) keyValueNext[i3+len3+2] = next2;
+          entry = next;
         }
       }
     }
