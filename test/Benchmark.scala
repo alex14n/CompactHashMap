@@ -13,19 +13,18 @@ object Benchmark {
   type T = Pos
   val rnd = new java.util.Random
   private[this] val values = (0 to iterations*2).toList map { x => new Pos(rnd.nextInt, rnd.nextInt) } toArray
-*/
+
   type T = Object
   private[this] val values = (0 to iterations*2).toList map { x => new Object } toArray
-/*
+*/
   type T = String
   private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
-
+/*
   type T = Int
   final def values(i: Int) = intKey(i)
 */
   private[this] var scalaMap: scala.collection.mutable.Map[T,T] = _
   private[this] var compactMap: CompactHashMap[T,T] = _
-  private[this] var openMap: OpenHashMap[T,T] = _
   private[this] var javaMap: java.util.Map[T,T] = _
   private[this] var troveIntMap: gnu.trove.TIntIntHashMap = _
   private[this] var fastutilIntMap: it.unimi.dsi.fastutil.ints.Int2IntMap = _
@@ -64,15 +63,6 @@ object Benchmark {
     var i = 0
     while (i < iterations) {
       javaMap put (values(i), values(2*iterations-i))
-      i += 1
-    }
-  }
-
-  def openWrite () {
-    openMap = new OpenHashMap[T,T]
-    var i = 0
-    while (i < iterations) {
-      openMap put (values(i), values(2*iterations-i))
       i += 1
     }
   }
@@ -151,26 +141,6 @@ object Benchmark {
     javaMap = null
   }
 
-  def openReadFull {
-    var i = 0
-    while (i < iterations) {
-      val j = reoder(i)
-      assert (openMap.get(values(j)) == values(2*iterations-j))
-      i += 1
-    }
-    // openMap.printStat
-  }
-
-  def openReadEmpty {
-    var i = iterations
-    while (i < 2*iterations) {
-      assert (! openMap.containsKey(values(i)))
-      i += 1
-    }
-    // openMap.printStat
-    openMap = null
-  }
-
   def troveIntReadFull {
     var i = 0
     while (i < iterations) {
@@ -208,9 +178,6 @@ object Benchmark {
   }
 
   val tests: List[(String,()=>Unit)] = List(
-    "openWrite" -> openWrite _,
-    "openReadFull" -> openReadFull _,
-    "openReadEmpty" -> openReadEmpty _,
     "fastWrite" -> {() => javaWrite(new FastHashMap)},
     "fastReadFull" -> javaReadFull _,
     "fastReadEmpty" -> javaReadEmpty _,
