@@ -527,4 +527,16 @@ public class FastHashMapTest {
     assertEquals(m2, m3);
     assertEquals(m3, m2);
   }
+
+  @Test public void testEntrySetRemove () {
+    Map<String,String> m = new FastHashMap<String,String>();
+    Set<Map.Entry<String,String>> entrySet = m.entrySet();
+    m.put("a", "b");
+    Map.Entry<String,String> e = new AbstractMap.SimpleEntry<String,String> ("a", "x");
+    assertFalse(entrySet.remove(e));
+    assertTrue(m.containsKey("a"));
+    e.setValue("b");
+    assertTrue(entrySet.remove(e));
+    assertFalse(m.containsKey("a"));
+  }
 }

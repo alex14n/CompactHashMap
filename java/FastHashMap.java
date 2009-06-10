@@ -524,7 +524,7 @@ public class FastHashMap<K,V>
      *         previously associated <tt>null</tt> with <tt>key</tt>.)
      */
     public V remove(Object key) {
-        V result = removeKey(key);
+        V result = removeKey(key, -1);
         return result == NOT_FOUND ? null : result;
     }
 
@@ -540,7 +540,7 @@ public class FastHashMap<K,V>
      * @return NOT_FOUND or old value
      */
     @SuppressWarnings("unchecked")
-    final V removeKey(Object key) {
+    final V removeKey(Object key, int index) {
         int hc = hash(key);
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
@@ -550,8 +550,14 @@ public class FastHashMap<K,V>
             int j = i & (hashLen-1);
             int k = hashLen + j;
             if (hcBits == (i & mask)) {
-                Object o = keyValueTable[j<<keyIndexShift];
-                if (o == key || o != null && o.equals(key)) {
+                boolean found;
+                if (index < 0) {
+                    Object o = keyValueTable[j<<keyIndexShift];
+                    found = o == key || o != null && o.equals(key);
+                } else {
+                    found = j == index;
+                }
+                if (found) {
                     size--;
                     if((i & END_OF_LIST) != 0) {
                         if (prev >= 0)
@@ -564,12 +570,15 @@ public class FastHashMap<K,V>
                     if (j == firstEmptyIndex-1) {
                         firstEmptyIndex = j;
                     } else {
-                        indexTable[k] = firstDeletedIndex < 0 ? END_OF_LIST : firstDeletedIndex+1;
+                        indexTable[k] = firstDeletedIndex < 0 ?
+                            END_OF_LIST : firstDeletedIndex+1;
                         firstDeletedIndex = j;
                     }
-                    Object oldValue = keyIndexShift > 0 ? keyValueTable[(j<<keyIndexShift)+1] : DUMMY_VALUE;
+                    Object oldValue = keyIndexShift > 0 ?
+                        keyValueTable[(j<<keyIndexShift)+1] : DUMMY_VALUE;
                     keyValueTable[j<<keyIndexShift] = null;
-                    if (keyIndexShift > 0) keyValueTable[(j<<keyIndexShift)+1] = null;
+                    if (keyIndexShift > 0)
+                        keyValueTable[(j<<keyIndexShift)+1] = null;
                     modCount++;
                     removeHook(j);
                     return (V)oldValue;
@@ -806,7 +815,7 @@ public class FastHashMap<K,V>
                 throw new IllegalStateException();
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
-            removeKey(keyValueTable[lastIndex<<keyIndexShift]);
+            removeKey(keyValueTable[lastIndex<<keyIndexShift], lastIndex);
             lastIndex = -1;
             expectedModCount = modCount;
         }
@@ -834,7 +843,7 @@ public class FastHashMap<K,V>
             return containsKey(o);
         }
         public boolean remove(Object o) {
-            return FastHashMap.this.removeKey(o) != NOT_FOUND;
+            return FastHashMap.this.removeKey(o, -1) != NOT_FOUND;
         }
         public void clear() {
           FastHashMap.this.clear();
@@ -885,10 +894,21 @@ public class FastHashMap<K,V>
             Object v2 = e.getValue();
             return v1 == v2 || v1 != null && v1.equals(v2);
         }
-        @SuppressWarnings("unchecked")
         public boolean remove(Object o) {
-            if (!contains(o)) return false;
-            removeKey(((Map.Entry<K,V>)o).getKey());
+            if (!(o instanceof Map.Entry))
+                return false;
+            @SuppressWarnings("unchecked")
+            Map.Entry<K,V> e = (Map.Entry<K,V>) o;
+            K key = e.getKey();
+            int i = positionOf(key);
+            if (i < 0) return false;
+            Object v1 = keyIndexShift > 0 ?
+                keyValueTable[(i<<keyIndexShift)+1] :
+                DUMMY_VALUE;
+            Object v2 = e.getValue();
+            if (v1 != v2 && (v1 == null || !v1.equals(v2)))
+                return false;
+            removeKey(key, i);
             return true;
         }
         public int size() {

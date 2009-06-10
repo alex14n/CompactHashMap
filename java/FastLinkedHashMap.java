@@ -358,7 +358,7 @@ public class FastLinkedHashMap<K,V>
             headEntry = new Entry(headIndex);
         }
         if(removeEldestEntry(headEntry)) {
-            removeKey(headEntry.getKey());
+            removeKey(headEntry.getKey(), headIndex);
         }
     }
 
