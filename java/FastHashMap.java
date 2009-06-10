@@ -537,7 +537,9 @@ public class FastHashMap<K,V>
      * Removes the mapping for the specified key from this map if present.
      *
      * @param key key whose mapping is to be removed from the map
-     * @return NOT_FOUND or old value
+     * @param index index of element to delete if it is >= 0
+     * @return NOT_FOUND or old value if index >= 0
+     * if index < 0 return value is undefined (usually null)
      */
     @SuppressWarnings("unchecked")
     final V removeKey(Object key, int index) {
@@ -574,8 +576,9 @@ public class FastHashMap<K,V>
                             END_OF_LIST : firstDeletedIndex+1;
                         firstDeletedIndex = j;
                     }
-                    Object oldValue = keyIndexShift > 0 ?
-                        keyValueTable[(j<<keyIndexShift)+1] : DUMMY_VALUE;
+                    Object oldValue = index >= 0 ? null :
+                        keyIndexShift == 0 ? DUMMY_VALUE :
+                        keyValueTable[(j<<keyIndexShift)+1];
                     keyValueTable[j<<keyIndexShift] = null;
                     if (keyIndexShift > 0)
                         keyValueTable[(j<<keyIndexShift)+1] = null;
