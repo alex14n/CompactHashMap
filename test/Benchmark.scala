@@ -25,7 +25,7 @@ object Benchmark {
 */
   private[this] var scalaMap: scala.collection.mutable.Map[T,T] = _
   private[this] var compactMap: CompactHashMap[T,T] = _
-  private[this] var hybridMap: HybridHashMap[T,T] = _
+  private[this] var openMap: OpenHashMap[T,T] = _
   private[this] var javaMap: java.util.Map[T,T] = _
   private[this] var troveIntMap: gnu.trove.TIntIntHashMap = _
   private[this] var fastutilIntMap: it.unimi.dsi.fastutil.ints.Int2IntMap = _
@@ -68,11 +68,11 @@ object Benchmark {
     }
   }
 
-  def hybridWrite () {
-    hybridMap = new HybridHashMap[T,T]
+  def openWrite () {
+    openMap = new OpenHashMap[T,T]
     var i = 0
     while (i < iterations) {
-      hybridMap put (values(i), values(2*iterations-i))
+      openMap put (values(i), values(2*iterations-i))
       i += 1
     }
   }
@@ -151,22 +151,24 @@ object Benchmark {
     javaMap = null
   }
 
-  def hybridReadFull {
+  def openReadFull {
     var i = 0
     while (i < iterations) {
       val j = reoder(i)
-      assert (hybridMap.get(values(j)) == values(2*iterations-j))
+      assert (openMap.get(values(j)) == values(2*iterations-j))
       i += 1
     }
+    // openMap.printStat
   }
 
-  def hybridReadEmpty {
+  def openReadEmpty {
     var i = iterations
     while (i < 2*iterations) {
-      assert (! hybridMap.containsKey(values(i)))
+      assert (! openMap.containsKey(values(i)))
       i += 1
     }
-    hybridMap = null
+    // openMap.printStat
+    openMap = null
   }
 
   def troveIntReadFull {
@@ -206,9 +208,9 @@ object Benchmark {
   }
 
   val tests: List[(String,()=>Unit)] = List(
-    "hybridWrite" -> hybridWrite _,
-    "hybridReadFull" -> hybridReadFull _,
-    "hybridReadEmpty" -> hybridReadEmpty _,
+    "openWrite" -> openWrite _,
+    "openReadFull" -> openReadFull _,
+    "openReadEmpty" -> openReadEmpty _,
     "fastWrite" -> {() => javaWrite(new FastHashMap)},
     "fastReadFull" -> javaReadFull _,
     "fastReadEmpty" -> javaReadEmpty _,
