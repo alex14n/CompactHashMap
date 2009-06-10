@@ -93,7 +93,7 @@ extends scala.collection.mutable.Set[T] {
   def += (elem: T): Unit = try {
     fixedSet.add (elem)
   } catch {
-    case e: ResizeNeeded =>
+    case ResizeNeeded =>
       if (fixedSet.elemClass ne null)
         fixedSet = FixedHashSet (fixedSet.bits + 1, fixedSet)
       else
@@ -273,7 +273,7 @@ private abstract class FixedHashSet[T] (
   /** Return index in array to insert new element.
    */
   protected final def findEmptySpot = {
-    if (counter >= arrayLength) throw new ResizeNeeded
+    if (counter >= arrayLength) throw ResizeNeeded
     counter += 1
     if (firstDeletedIndex >= 0) {
       val i = firstDeletedIndex
@@ -556,7 +556,7 @@ private final object FixedHashSet {
   final def copyOf (a: Array[Double], l: Int) = { val n = new Array[Double](l); arraycopy(a,0,n,0,a.length); n }
   final def copyOf (a: Array[Object], l: Int) = { val n = new Array[Object](l); arraycopy(a,0,n,0,a.length); n }
 */
-  final class ResizeNeeded extends Exception
+  final object ResizeNeeded extends Exception
 
   final val initialBits = 2 // 4 elements
 
@@ -1139,7 +1139,7 @@ private final object FixedHashSet {
     final def hcBitmask = 0
     final def getIndexArray = null
     final def rehash (that: FixedHashSet[Any]) { }
-    final override def add (elem: Any): Int = { throw new ResizeNeeded }
+    final override def add (elem: Any): Int = { throw ResizeNeeded }
   }
 
   /** Construct FixedHashSet implementation with given parameters.

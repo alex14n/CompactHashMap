@@ -238,7 +238,7 @@ class CompactHashMap[K,V] (
       val i = myKeys.add (key)
       myValues(i) = value
     } catch {
-      case e: ResizeNeeded =>
+      case ResizeNeeded =>
         resize (key, value, myKeys.bits + 1)
         val i2 = myKeys.addNew (key)
         myValues(i2) = value
@@ -257,7 +257,7 @@ class CompactHashMap[K,V] (
       val i = myKeys.addInt (key)
       myValues(i) = value
     } catch {
-      case e: ResizeNeeded =>
+      case ResizeNeeded =>
         val boxedKey = key.asInstanceOf[K]
         resize (boxedKey, value, myKeys.bits + 1)
         val i2 = myKeys.addNew (boxedKey)
@@ -279,7 +279,7 @@ class CompactHashMap[K,V] (
           val i = myKeys.addInt (key)
           bia.value(i) = value
         } catch {
-          case e: ResizeNeeded =>
+          case ResizeNeeded =>
             val boxedKey = key.asInstanceOf[K]
             val boxedValue = value.asInstanceOf[V]
             resize (boxedKey, boxedValue, myKeys.bits + 1)
@@ -304,7 +304,7 @@ class CompactHashMap[K,V] (
         val j = myKeys.addNew (key)
         myValues(j) = newV
       } catch {
-        case e: ResizeNeeded =>
+        case ResizeNeeded =>
           resize (key, newV, myKeys.bits + 1)
           val j = myKeys.addNew (key)
           myValues(j) = newV
@@ -327,7 +327,7 @@ class CompactHashMap[K,V] (
         val j = myKeys.addNew (key)
         myValues(j) = newV
       } catch {
-        case e: ResizeNeeded =>
+        case ResizeNeeded =>
           resize (key, newV, myKeys.bits + 1)
           val j = myKeys.addNew (key)
           myValues(j) = newV
@@ -348,7 +348,7 @@ class CompactHashMap[K,V] (
       val j = myKeys.addNew (key)
       myValues(j) = newValue
     } catch {
-      case e: ResizeNeeded =>
+      case ResizeNeeded =>
         resize (key, newValue, myKeys.bits + 1)
         val j = myKeys.addNew (key)
         myValues(j) = newValue
