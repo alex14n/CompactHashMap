@@ -255,10 +255,8 @@ public class FastHashMap<K,V>
     FastHashMap(boolean withValues) {
         loadFactor = DEFAULT_LOAD_FACTOR;
         hashLen = DEFAULT_INITIAL_CAPACITY;
-        threshold = 0;
+        threshold = (int)(hashLen * loadFactor);
         keyIndexShift = withValues ? 1 : 0;
-        keyValueTable = null;
-        indexTable = null;
         init();
     }
 
@@ -297,8 +295,6 @@ public class FastHashMap<K,V>
             throw new IllegalArgumentException(
                 "Illegal load factor: " + loadFactor);
         keyIndexShift = withValues ? 1 : 0;
-        keyValueTable = new Object[threshold<<keyIndexShift];
-        indexTable = new int[hashLen+threshold];
         init();
     }
 
@@ -471,7 +467,14 @@ public class FastHashMap<K,V>
     final V put(K key, V value, boolean searchForExistingKey) {
         int hc = hash(key);
         int i = hc & (hashLen - 1);
-        int next = indexTable == null ? 0 : indexTable[i];
+        int next;
+        if (indexTable != null) {
+            next = indexTable[i];
+        } else {
+            next = 0;
+            indexTable = new int[hashLen+threshold];
+            keyValueTable = new Object[threshold<<keyIndexShift];
+        }
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         // Look if key is already in this map
