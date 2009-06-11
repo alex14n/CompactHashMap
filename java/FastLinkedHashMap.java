@@ -270,7 +270,10 @@ public class FastLinkedHashMap<K,V>
      */
     void resize(int newCapacity) {
         super.resize(newCapacity);
-        beforeAfter = Arrays.copyOf(beforeAfter, threshold<<1);
+        if (beforeAfter != null)
+            beforeAfter = Arrays.copyOf(beforeAfter, threshold<<1);
+        else if (threshold > 0)
+          beforeAfter = new int[threshold<<1];
     }
 
     /**
@@ -281,7 +284,8 @@ public class FastLinkedHashMap<K,V>
      */
     public FastLinkedHashMap<K,V> clone() {
         FastLinkedHashMap<K,V> that = (FastLinkedHashMap<K,V>)super.clone();
-        that.beforeAfter = beforeAfter.clone();
+        if (beforeAfter != null)
+            that.beforeAfter = beforeAfter.clone();
         that.headEntry = null;
         return that;
     }
@@ -337,7 +341,8 @@ public class FastLinkedHashMap<K,V>
      * the chain.
      */
     void init() {
-        beforeAfter = new int[threshold<<1];
+        if (threshold > 0)
+            beforeAfter = new int[threshold<<1];
         headIndex = -1;
         headEntry = null;
     }
@@ -381,8 +386,29 @@ public class FastLinkedHashMap<K,V>
     void updateHook(int i) {
         updateIndex(i);
         if(headEntry != null && headIndex == i && keyIndexShift > 0)
-          headEntry.value = (V)keyValueTable[(i<<keyIndexShift)+1];
+            headEntry.value = (V)keyValueTable[(i<<keyIndexShift)+1];
+    }
 
+    /**
+     * This method is called when element is relocated
+     * during defragmentation.
+     */
+    void relocateHook(int newIndex, int oldIndex) {
+        if (size == 1) {
+            beforeAfter[newIndex<<1] =
+            beforeAfter[(newIndex<<1)+1] = newIndex;
+        } else {
+            int prev = beforeAfter[oldIndex<<1];
+            int next = beforeAfter[(oldIndex<<1)+1];
+            beforeAfter[newIndex<<1] = prev;
+            beforeAfter[(newIndex<<1)+1] = next;
+            beforeAfter[(prev<<1)+1] =
+            beforeAfter[next<<1] = newIndex;
+        }
+        if (headIndex == oldIndex) {
+            headIndex = newIndex;
+            headEntry = null;
+        }
     }
 
     // Iteration order based on the linked list.
@@ -465,6 +491,8 @@ public class FastLinkedHashMap<K,V>
             int numberOfEntries = 0;
             int next = -1;
             for (int i = headIndex; next != headIndex; i = next) {
+                if (i < 0 || i >= firstEmptyIndex || isEmpty(i))
+                    throw new RuntimeException("Empty index "+i+", headIndex="+headIndex);
                 numberOfEntries++;
                 next = beforeAfter[(i<<1)+1];
                 if (beforeAfter[next<<1] != i)

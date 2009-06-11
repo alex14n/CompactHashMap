@@ -293,4 +293,54 @@ public class FastLinkedHashMapTest {
     assertFalse(i.hasNext());
     assertEquals("{2=b, 3=c}", map2.toString());
   }
+
+
+  static class ZeroHash {
+    int n;
+    ZeroHash(int n) { this.n = n; }
+    public int hashCode() { return 0; }
+    public boolean equals(Object o) {
+      return o instanceof ZeroHash ? ((ZeroHash)o).n == n : false;
+    }
+    public String toString() { return "ZeroHash("+n+")"; }
+  }
+  @Test public void testOneBasket () {
+    Map<ZeroHash,String> m = new FastLinkedHashMap<ZeroHash,String>();
+    int n = 6;
+    for (int i = 0; i < (1<<n); i++) {
+      m.clear();
+      for(int j = 0; j < n; j++)
+        m.put(new ZeroHash(j), ""+j);
+      int size = n;
+      for(int j = 0; j < n; j++)
+        if((i & (1<<j)) == 0) {
+          m.remove(new ZeroHash(j));
+          size--;
+        }
+      assertEquals(size, m.size());
+      for(int j = 0; j < n; j++)
+        assertEquals((i & (1<<j)) != 0, m.containsKey(new ZeroHash(j)));
+      //
+      Iterator<ZeroHash> ik = m.keySet().iterator();
+      for(int j = 0; j < n; j++)
+        if((i & (1<<j)) != 0)
+           assertEquals(j, ik.next().n);
+      assertFalse(ik.hasNext());
+      //
+      Iterator<Map.Entry<ZeroHash,String>> ie = m.entrySet().iterator();
+      for(int j = 0; j < n; j++)
+        if((i & (1<<j)) != 0) {
+          Map.Entry<ZeroHash,String> e = ie.next();
+          assertEquals(j, e.getKey().n);
+          assertEquals(""+j, e.getValue());
+        }
+      assertFalse(ie.hasNext());
+      //
+      Iterator<String> iv = m.values().iterator();
+      for(int j = 0; j < n; j++)
+        if((i & (1<<j)) != 0)
+          assertEquals(""+j, iv.next());
+      assertFalse(iv.hasNext());
+    }
+  }
 }
