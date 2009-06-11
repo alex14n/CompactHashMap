@@ -255,10 +255,10 @@ public class FastHashMap<K,V>
     FastHashMap(boolean withValues) {
         loadFactor = DEFAULT_LOAD_FACTOR;
         hashLen = DEFAULT_INITIAL_CAPACITY;
-        threshold = (int)(hashLen * loadFactor);
+        threshold = 0;
         keyIndexShift = withValues ? 1 : 0;
-        keyValueTable = new Object[threshold<<keyIndexShift];
-        indexTable = new int[hashLen+threshold];
+        keyValueTable = null;
+        indexTable = null;
         init();
     }
 
@@ -356,45 +356,51 @@ public class FastHashMap<K,V>
      */
     void resize(int newCapacity) {
         int newValueLen = (int)(newCapacity * loadFactor);
-        Object[] newKeyValues = Arrays.copyOf(keyValueTable, newValueLen<<keyIndexShift);
+        Object[] newKeyValues;
+        if (keyValueTable != null)
+            newKeyValues = Arrays.copyOf(keyValueTable, newValueLen<<keyIndexShift);
+        else
+            newKeyValues = new Object[newValueLen<<keyIndexShift];
         int[] newIndices = new int[newCapacity+newValueLen];
-        int mask = AVAILABLE_BITS ^ (hashLen-1);
-        int newMask = AVAILABLE_BITS ^ (newCapacity-1);
-        for (int i = 0; i < hashLen; i++) {
-            int next1i = -1, next1v = 0;
-            int next2i = -1, next2v = 0;
-            int arrayIndex;
-            for (int j = ~indexTable[i]; j >= 0; j = ~indexTable[hashLen + arrayIndex]) {
-                arrayIndex = j & (hashLen-1);
-                int newHashIndex = i | (j & (newMask ^ mask));
-                if (newHashIndex == i) {
-                    if (next1i >= 0) {
-                        newIndices[next1i] = ~next1v;
-                        next1i = newCapacity + (next1v & (newCapacity-1));
+        if (indexTable != null) {
+            int mask = AVAILABLE_BITS ^ (hashLen-1);
+            int newMask = AVAILABLE_BITS ^ (newCapacity-1);
+            for (int i = 0; i < hashLen; i++) {
+                int next1i = -1, next1v = 0;
+                int next2i = -1, next2v = 0;
+                int arrayIndex;
+                for (int j = ~indexTable[i]; j >= 0; j = ~indexTable[hashLen + arrayIndex]) {
+                    arrayIndex = j & (hashLen-1);
+                    int newHashIndex = i | (j & (newMask ^ mask));
+                    if (newHashIndex == i) {
+                        if (next1i >= 0) {
+                            newIndices[next1i] = ~next1v;
+                            next1i = newCapacity + (next1v & (newCapacity-1));
+                        } else {
+                            next1i = newHashIndex;
+                        }
+                        next1v = arrayIndex | (j & newMask);
+                    } else if (newHashIndex == i+hashLen) {
+                        if (next2i >= 0) {
+                            newIndices[next2i] = ~next2v;
+                            next2i = newCapacity + (next2v & (newCapacity-1));
+                        } else {
+                            next2i = newHashIndex;
+                        }
+                        next2v = arrayIndex | (j & newMask);
                     } else {
-                        next1i = newHashIndex;
+                        int oldIndex = newIndices[newHashIndex];
+                        if (oldIndex < 0)
+                            newIndices[newCapacity + arrayIndex] = oldIndex;
+                        int newIndex = ~(arrayIndex | (j & newMask) |
+                            (oldIndex < 0 ? 0 : END_OF_LIST));
+                        newIndices[newHashIndex] = newIndex;
                     }
-                    next1v = arrayIndex | (j & newMask);
-                } else if (newHashIndex == i+hashLen) {
-                    if (next2i >= 0) {
-                        newIndices[next2i] = ~next2v;
-                        next2i = newCapacity + (next2v & (newCapacity-1));
-                    } else {
-                        next2i = newHashIndex;
-                    }
-                    next2v = arrayIndex | (j & newMask);
-                } else {
-                    int oldIndex = newIndices[newHashIndex];
-                    if (oldIndex < 0)
-                        newIndices[newCapacity + arrayIndex] = oldIndex;
-                    int newIndex = ~(arrayIndex | (j & newMask) |
-                        (oldIndex < 0 ? 0 : END_OF_LIST));
-                    newIndices[newHashIndex] = newIndex;
+                    if ((j & END_OF_LIST) != 0) break;
                 }
-                if ((j & END_OF_LIST) != 0) break;
+                if (next1i >= 0) newIndices[next1i] = ~(next1v | END_OF_LIST);
+                if (next2i >= 0) newIndices[next2i] = ~(next2v | END_OF_LIST);
             }
-            if (next1i >= 0) newIndices[next1i] = ~(next1v | END_OF_LIST);
-            if (next2i >= 0) newIndices[next2i] = ~(next2v | END_OF_LIST);
         }
         hashLen = newCapacity;
         threshold = newValueLen;
@@ -410,18 +416,25 @@ public class FastHashMap<K,V>
      * @return index of key in array or -1 if it was not found
      */
     final int positionOf(Object key) {
+        if (indexTable == null) return -1;
         int hc = hash(key);
-        int mask = AVAILABLE_BITS ^ (hashLen-1);
-        int hcBits = hc & mask;
         int curr = hc & (hashLen-1);
-        int next;
-        for (int i = ~indexTable[curr]; i >= 0; i = ~indexTable[next]) {
+        int mask = AVAILABLE_BITS ^ (hashLen-1);
+        for (int i = ~unsafe.getInt(indexTable,
+                sun.misc.Unsafe.ARRAY_INT_BASE_OFFSET +
+                (long)curr * sun.misc.Unsafe.ARRAY_INT_INDEX_SCALE); // ~indexTable[curr];
+            i >= 0;
+            i = ~unsafe.getInt(indexTable,
+                sun.misc.Unsafe.ARRAY_INT_BASE_OFFSET +
+                (long)(hashLen+curr) * sun.misc.Unsafe.ARRAY_INT_INDEX_SCALE)
+        ) { // ~indexTable[hashLen+curr]) {
             curr = i & (hashLen-1);
-            next = curr + hashLen;
             // Check if stored hashcode bits are equal
             // to hashcode of the key we are looking for
-            if (hcBits == (i & mask)) {
-                Object x = keyValueTable[curr<<keyIndexShift];
+            if ((hc & mask) == (i & mask)) {
+                Object x = unsafe.getObject(keyValueTable,
+                    sun.misc.Unsafe.ARRAY_OBJECT_BASE_OFFSET +
+                    (long)(curr<<keyIndexShift) * sun.misc.Unsafe.ARRAY_OBJECT_INDEX_SCALE); // keyValueTable[curr<<keyIndexShift];
                 if (x == key || x != null && x.equals(key))
                     return curr;
             }
@@ -429,6 +442,17 @@ public class FastHashMap<K,V>
         }
         return -1;
     }
+
+    private static sun.misc.Unsafe unsafe; // = sun.misc.Unsafe.getUnsafe();
+    static {
+        try {
+            java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
+            f.setAccessible(true);
+            unsafe = (sun.misc.Unsafe)f.get(null);
+        } catch (Exception ex) {
+            throw new RuntimeException(ex);
+        }
+    };
 
     /**
      * Returns <tt>true</tt> if i-th array position
@@ -467,13 +491,13 @@ public class FastHashMap<K,V>
     final V put(K key, V value, boolean searchForExistingKey) {
         int hc = hash(key);
         int i = hc & (hashLen - 1);
-        int next = indexTable[i];
+        int next = indexTable == null ? 0 : indexTable[i];
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
         // Look if key is already in this map
         int depth = 1;
         boolean callback = this instanceof FastLinkedHashMap;
-        if(searchForExistingKey) {
+        if (searchForExistingKey) {
             int k;
             for (int j = ~next; j >= 0; j = ~indexTable[hashLen+k]) {
                 k = j & (hashLen - 1);
@@ -493,7 +517,7 @@ public class FastHashMap<K,V>
             }
         }
         // Resize if needed
-        boolean defragment = depth > 1 && firstEmptyIndex+depth <= threshold;
+        boolean defragment = depth > 2 && firstEmptyIndex+depth <= threshold;
         if (size >= threshold) {
             resize(hashLen<<1);
             i = hc & (hashLen - 1);
@@ -587,6 +611,7 @@ public class FastHashMap<K,V>
      */
     @SuppressWarnings("unchecked")
     final V removeKey(Object key, int index) {
+        if (indexTable == null) return (V)NOT_FOUND;
         int hc = hash(key);
         int mask = AVAILABLE_BITS ^ (hashLen-1);
         int hcBits = hc & mask;
@@ -643,8 +668,10 @@ public class FastHashMap<K,V>
      * The map will be empty after this call returns.
      */
     public void clear() {
-        Arrays.fill(keyValueTable, 0, firstEmptyIndex<<keyIndexShift, null);
-        Arrays.fill(indexTable, 0, hashLen + firstEmptyIndex, 0);
+        if (keyValueTable != null)
+            Arrays.fill(keyValueTable, 0, firstEmptyIndex<<keyIndexShift, null);
+        if (indexTable != null)
+            Arrays.fill(indexTable, 0, hashLen + firstEmptyIndex, 0);
         size = 0;
         firstEmptyIndex = 0;
         firstDeletedIndex = -1;
@@ -664,8 +691,10 @@ public class FastHashMap<K,V>
             that = (FastHashMap<K,V>)super.clone();
         } catch (CloneNotSupportedException e) {
         }
-        that.keyValueTable = keyValueTable.clone();
-        that.indexTable = indexTable.clone();
+        if (keyValueTable != null)
+            that.keyValueTable = keyValueTable.clone();
+        if (indexTable != null)
+            that.indexTable = indexTable.clone();
         that.keySet = null;
         that.values = null;
         that.entrySet = null;

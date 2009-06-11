@@ -270,7 +270,10 @@ public class FastLinkedHashMap<K,V>
      */
     void resize(int newCapacity) {
         super.resize(newCapacity);
-        beforeAfter = Arrays.copyOf(beforeAfter, threshold<<1);
+        if (beforeAfter != null)
+            beforeAfter = Arrays.copyOf(beforeAfter, threshold<<1);
+        else if (threshold > 0)
+          beforeAfter = new int[threshold<<1];
     }
 
     /**
@@ -281,7 +284,8 @@ public class FastLinkedHashMap<K,V>
      */
     public FastLinkedHashMap<K,V> clone() {
         FastLinkedHashMap<K,V> that = (FastLinkedHashMap<K,V>)super.clone();
-        that.beforeAfter = beforeAfter.clone();
+        if (beforeAfter != null)
+            that.beforeAfter = beforeAfter.clone();
         that.headEntry = null;
         return that;
     }
@@ -337,7 +341,8 @@ public class FastLinkedHashMap<K,V>
      * the chain.
      */
     void init() {
-        beforeAfter = new int[threshold<<1];
+        if (threshold > 0)
+            beforeAfter = new int[threshold<<1];
         headIndex = -1;
         headEntry = null;
     }
