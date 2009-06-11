@@ -1,10 +1,30 @@
+Strong points:
  * All data is stored in 2-3 arrays, no HashEntry objects => less memory, more GC friendly
  * No dynamic memory allocation when adding a new key/value mapping (only during resize)
  * Iteration over elements is a sequental array read => faster
  * Adding a new key/value is a sequental array write => faster
- * Preserves iteration order (if no keys were removed it's the same order they were inserted)
+ * (Scala only) Preserves iteration order:
+   if no keys were removed it's the same order they were inserted
+   Java version also breaks iteration order during defragmentation
  * HashCode bits are stored in index array => less random reads when looking for missing key
  * (Scala only) Primitive types are stored in primitive arrays => saves a lot of memory
+
+Weak points:
+ * entrySet().iterator() each time creates a new Entry object, which can be slow
+   but in many cases this is helped with Server VM and -XX:+DoEscapeAnalysis
+ * iterators remove() method is slower than java.util.HashMap
+ * (Scala only) keys and values are stored in different arrays which is slower
+ * (Scala only) key remove operation is not optimized
+
+Some discussion:
+http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-June/001758.html
+http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-June/001763.html
+http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-June/001788.html
+http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-June/001809.html
+http://www.nabble.com/CompactHashMap-ts23358808.html
+http://forums.sun.com/thread.jspa?messageID=10716110
+
+Scala version will be rewritten with type specialization after it's released (version 2.8?)
 
 
 If performance is more important than memory footprint you can modify:
