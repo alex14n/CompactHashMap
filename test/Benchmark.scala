@@ -6,6 +6,10 @@ final class Pos(final val x:Int, final val y:Int) {
   }
 }
 
+final class BadHash {
+  override def hashCode = super.hashCode & 0xFFFFF
+}
+
 object Benchmark {
   private[this] val iterations = 0x180000
   final def intKey(i: Int) = i*123
@@ -13,13 +17,16 @@ object Benchmark {
   type T = Pos
   val rnd = new java.util.Random
   private[this] val values = (0 to iterations*2).toList map { x => new Pos(rnd.nextInt, rnd.nextInt) } toArray
-
+*/
+  type T = BadHash
+  private[this] val values = (0 to iterations*2).toList map { x => new BadHash } toArray
+/*
   type T = Object
   private[this] val values = (0 to iterations*2).toList map { x => new Object } toArray
-*/
+
   type T = String
   private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
-/*
+
   type T = Int
   final def values(i: Int) = intKey(i)
 */
@@ -28,6 +35,7 @@ object Benchmark {
   private[this] var javaMap: java.util.Map[T,T] = _
   private[this] var troveIntMap: gnu.trove.TIntIntHashMap = _
   private[this] var fastutilIntMap: it.unimi.dsi.fastutil.ints.Int2IntMap = _
+  private[this] var fastopenMap: FastOpenHashMap[T,T] = _
 
   private[this] val rt = Runtime.getRuntime()
 
@@ -63,6 +71,15 @@ object Benchmark {
     var i = 0
     while (i < iterations) {
       javaMap put (values(i), values(2*iterations-i))
+      i += 1
+    }
+  }
+
+  def fastopenWrite () {
+    fastopenMap = new FastOpenHashMap
+    var i = 0
+    while (i < iterations) {
+      fastopenMap put (values(i), values(2*iterations-i))
       i += 1
     }
   }
@@ -141,6 +158,24 @@ object Benchmark {
     javaMap = null
   }
 
+  def fastopenReadFull {
+    var i = 0
+    while (i < iterations) {
+      val j = reoder(i)
+      assert (fastopenMap.get(values(j)) == values(2*iterations-j))
+      i += 1
+    }
+  }
+
+  def fastopenReadEmpty {
+    var i = iterations
+    while (i < 2*iterations) {
+      assert (! fastopenMap.containsKey(values(i)))
+      i += 1
+    }
+    fastopenMap = null
+  }
+
   def troveIntReadFull {
     var i = 0
     while (i < iterations) {
@@ -178,10 +213,13 @@ object Benchmark {
   }
 
   val tests: List[(String,()=>Unit)] = List(
-    "fastWrite" -> {() => javaWrite(new FastHashMap)},
+    "fastopenWrite" -> fastopenWrite _,
+    "fastopenReadFull" -> fastopenReadFull _,
+    "fastopenReadEmpty" -> fastopenReadEmpty _,
+    "fastWrite" -> {() => javaWrite(new FastHashMap(16, .75f))},
     "fastReadFull" -> javaReadFull _,
     "fastReadEmpty" -> javaReadEmpty _,
-    "javaWrite" -> {() => javaWrite(new java.util.HashMap)},
+    "javaWrite" -> {() => javaWrite(new java.util.HashMap(16, .75f))},
     "javaReadFull" -> javaReadFull _,
     "javaReadEmpty" -> javaReadEmpty _,
 /*
