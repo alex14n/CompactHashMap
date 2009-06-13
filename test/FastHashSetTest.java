@@ -27,8 +27,8 @@ public class FastHashSetTest {
 
     // Check iterator
     Iterator<String> i = set.iterator();
-    assertEquals("1", i.next());
     assertEquals(null, i.next());
+    assertEquals("1", i.next());
     assertEquals("2", i.next());
     assertEquals("3", i.next());
     assertFalse(i.hasNext());

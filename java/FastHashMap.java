@@ -100,6 +100,14 @@ public class FastHashMap<K,V>
     implements Cloneable, Serializable, Map<K,V>
 {
     /**
+     * True if this map contains null key.
+     * This makes iteration faster:
+     * null key in table == empty cell,
+     * no need for index table lookup.
+     */
+    transient boolean nullKeyPresent;
+
+    /**
      * The default initial capacity - MUST be a power of two.
      */
     static final int DEFAULT_INITIAL_CAPACITY = 4;
@@ -123,10 +131,13 @@ public class FastHashMap<K,V>
     final static int AVAILABLE_BITS = 0x3FFFFFFF;
 
     /**
-     * Bit flag marking the end of list of elements with the same hashcode,
-     * or end of deleted list.
+     * Bits with control information on where to look for next entry in hash bin.
      */
-    final static int END_OF_LIST = 0x40000000;
+    final static int CONTROL_BITS     = 0xC0000000;
+    final static int CONTROL_EMPTY    = 0;
+    final static int CONTROL_NEXT     = 0x40000000;
+    final static int CONTROL_OVERFLOW = 0x80000000;
+    final static int CONTROL_END      = 0xC0000000;
 
     /**
      * The maximum capacity, used if a higher value is implicitly specified
@@ -351,10 +362,11 @@ public class FastHashMap<K,V>
      * and greater than current capacity (hashLen).
      */
     void resize(int newCapacity) {
+        // New storage allocation
         int newValueLen = (int)(newCapacity * loadFactor);
         Object[] newKeyValues;
         if (keyValueTable != null)
-            newKeyValues = Arrays.copyOf(keyValueTable, newValueLen<<keyIndexShift);
+            newKeyValues = Arrays.copyOf(keyValueTable, (newValueLen<<keyIndexShift)+1);
         else
             newKeyValues = new Object[newValueLen<<keyIndexShift];
         int[] newIndices = new int[newCapacity+newValueLen];
@@ -362,72 +374,106 @@ public class FastHashMap<K,V>
             int mask = AVAILABLE_BITS ^ (hashLen-1);
             int newMask = AVAILABLE_BITS ^ (newCapacity-1);
             for (int i = 0; i < hashLen; i++) {
-                int next1i = -1, next1v = 0;
-                int next2i = -1, next2v = 0;
-                int arrayIndex;
-                for (int j = ~indexTable[i]; j >= 0; j = ~indexTable[hashLen + arrayIndex]) {
-                    arrayIndex = j & (hashLen-1);
-                    int newHashIndex = i | (j & (newMask ^ mask));
-                    if (newHashIndex == i) {
-                        if (next1i >= 0) {
-                            newIndices[next1i] = ~next1v;
-                            next1i = newCapacity + (next1v & (newCapacity-1));
-                        } else {
-                            next1i = newHashIndex;
-                        }
-                        next1v = arrayIndex | (j & newMask);
-                    } else if (newHashIndex == i+hashLen) {
-                        if (next2i >= 0) {
-                            newIndices[next2i] = ~next2v;
-                            next2i = newCapacity + (next2v & (newCapacity-1));
-                        } else {
-                            next2i = newHashIndex;
-                        }
-                        next2v = arrayIndex | (j & newMask);
+                int j = indexTable[i];
+                if ((j & CONTROL_BITS) == CONTROL_EMPTY) continue;
+                if ((j & CONTROL_BITS) == CONTROL_NEXT) {
+                    int arrayIndex1 = j & (hashLen-1);
+                    int newHashIndex1 = i | (j & (newMask ^ mask));
+                    int i2 = (i+1) & (hashLen-1);
+                    int j2 = indexTable[i2];
+                    int arrayIndex2 = j2 & (hashLen-1);
+                    int newHashIndex2 = i | (j2 & (newMask ^ mask));
+                    if (newHashIndex1 == newHashIndex2) {
+                        newIndices[newHashIndex1] =
+                            arrayIndex1 | (j  & newMask) | CONTROL_NEXT;
+                        newIndices[(newHashIndex1+1)&(newCapacity-1)] =
+                            arrayIndex2 | (j2 & newMask); // | CONTROL_EMPTY;
                     } else {
-                        int oldIndex = newIndices[newHashIndex];
-                        if (oldIndex < 0)
-                            newIndices[newCapacity + arrayIndex] = oldIndex;
-                        int newIndex = ~(arrayIndex | (j & newMask) |
-                            (oldIndex < 0 ? 0 : END_OF_LIST));
-                        newIndices[newHashIndex] = newIndex;
+                        newIndices[newHashIndex1] = arrayIndex1 | (j  & newMask) | CONTROL_END;
+                        newIndices[newHashIndex2] = arrayIndex2 | (j2 & newMask) | CONTROL_END;
                     }
-                    if ((j & END_OF_LIST) != 0) break;
+                } else { // CONTROL_OVERFLOW and CONTROL_END
+                    int next1i = -1, next1v = 0;
+                    int next2i = -1, next2v = 0;
+                    while (true) {
+                        int arrayIndex = j & (hashLen-1);
+                        int newHashIndex = i | (j & (newMask ^ mask));
+                        if (newHashIndex == i) {
+                            if (next1i >= 0) {
+                                newIndices[next1i] = next1v | CONTROL_OVERFLOW;
+                                next1i = newCapacity + (next1v & (newCapacity-1));
+                            } else next1i = newHashIndex;
+                            next1v = arrayIndex | (j & newMask);
+                        } else if (newHashIndex == i+hashLen) {
+                            if (next2i >= 0) {
+                                newIndices[next2i] = next2v | CONTROL_OVERFLOW;
+                                next2i = newCapacity + (next2v & (newCapacity-1));
+                            } else next2i = newHashIndex;
+                            next2v = arrayIndex | (j & newMask);
+                        } else {
+                            int newIndex = arrayIndex | (j & newMask);
+                            int oldIndex = newIndices[newHashIndex];
+                            if ((oldIndex & CONTROL_BITS) != CONTROL_EMPTY) {
+                                newIndices[newCapacity + arrayIndex] = oldIndex;
+                                newIndex |= CONTROL_OVERFLOW;
+                            } else newIndex |= CONTROL_END;
+                            newIndices[newHashIndex] = newIndex;
+                        }
+                        if ((j & CONTROL_BITS) == CONTROL_END) break;
+                        j = indexTable[hashLen+arrayIndex];
+                    }
+                    if (next1i >= 0) newIndices[next1i] = next1v | CONTROL_END;
+                    if (next2i >= 0) newIndices[next2i] = next2v | CONTROL_END;
                 }
-                if (next1i >= 0) newIndices[next1i] = ~(next1v | END_OF_LIST);
-                if (next2i >= 0) newIndices[next2i] = ~(next2v | END_OF_LIST);
+            }
+            // Copy deleted list
+            for (int i = firstDeletedIndex; i >= 0 && i != CONTROL_END;) {
+                i = (newIndices[hashLen + i] = indexTable[hashLen + i]);
             }
         }
         hashLen = newCapacity;
         threshold = newValueLen;
         keyValueTable = newKeyValues;
         indexTable = newIndices;
-        // validate();
+        // validate("Resize");
     }
 
     /**
      * Returns the index of key in internal arrays if it is present.
      *
      * @param key key
-     * @return index of key in array or -1 if it was not found
+     * @return index of key in array, -1 for null key or -2 if it was not found
      */
     final int positionOf(Object key) {
-        if (indexTable == null) return -1;
+        // Null special case
+        if (key == null) return nullKeyPresent ? -1 : -2;
+        // Check arrays lazy allocation
+        if (indexTable == null) return -2;
+        // Compute hash index
         int hc = hash(key);
-        int curr = hc & (hashLen-1);
+        int cur = hc & (hashLen-1);
+        int i = indexTable[cur];
+        // Empty?
         int mask = AVAILABLE_BITS ^ (hashLen-1);
-        for (int i = ~indexTable[curr]; i >= 0; i = ~indexTable[hashLen+curr]) {
-            curr = i & (hashLen-1);
-            // Check if stored hashcode bits are equal
-            // to hashcode of the key we are looking for
-            if ((hc & mask) == (i & mask)) {
-                Object x = keyValueTable[curr<<keyIndexShift];
-                if (x == key || x != null && x.equals(key))
-                    return curr;
+        if ((i & CONTROL_BITS) == CONTROL_EMPTY) return -2;
+        // Search
+        while (true) {
+            int j = i & (hashLen-1);
+            if ((i & mask) == (hc & mask)) {
+                Object key1 = keyValueTable[(j<<keyIndexShift)+1];
+                if (key == key1 || key.equals(key1))
+                    return j;
             }
-            if ((i & END_OF_LIST) != 0) return -1;
+            // Move forward
+            if ((i & CONTROL_BITS) == CONTROL_OVERFLOW)
+                cur = hashLen+j;
+            else if ((i & CONTROL_BITS) == CONTROL_NEXT)
+                cur = (cur+1) & (hashLen-1);
+            else break;
+            i = indexTable[cur];
         }
-        return -1;
+        // Not found
+        return -2;
     }
 
     /**
@@ -438,8 +484,9 @@ public class FastHashMap<K,V>
      * @return <tt>true</tt> if i-th is empty (was deleted)
      */
     final boolean isEmpty(int i) {
-        return firstDeletedIndex >= 0 &&
-            (i == firstDeletedIndex || indexTable[hashLen+i] > 0);
+        return i == -1 ? !nullKeyPresent :
+            firstDeletedIndex >= 0 &&
+            keyValueTable[(i<<keyIndexShift)+1] == null;
     }
 
     /**
@@ -465,6 +512,26 @@ public class FastHashMap<K,V>
      */
     @SuppressWarnings("unchecked")
     final V put(K key, V value, boolean searchForExistingKey) {
+        boolean callback = this instanceof FastLinkedHashMap;
+        // Null special case
+        if (key == null) {
+            Object oldValue;
+            if (keyIndexShift > 0) {
+                if (keyValueTable == null)
+                    keyValueTable = new Object[(threshold<<keyIndexShift)+1];
+                oldValue = keyValueTable[0];
+                keyValueTable[0] = value;
+            } else oldValue = nullKeyPresent ? DUMMY_VALUE : null;
+            if (nullKeyPresent) {
+                if (callback) updateHook(-1);
+            } else {
+                nullKeyPresent = true;
+                size++;
+                if (callback) addHook(-1);
+            }
+            return (V)oldValue;
+        }
+        //
         int hc = hash(key);
         int i = hc & (hashLen - 1);
         int next;
@@ -473,30 +540,44 @@ public class FastHashMap<K,V>
         } else {
             next = 0;
             indexTable = new int[hashLen+threshold];
-            keyValueTable = new Object[threshold<<keyIndexShift];
+            if (keyValueTable == null)
+                keyValueTable = new Object[(threshold<<keyIndexShift)+1];
         }
-        int mask = AVAILABLE_BITS ^ (hashLen-1);
-        int hcBits = hc & mask;
+        // Check if this cell is occupied by another hash bin
+        if ((next & CONTROL_BITS) == CONTROL_EMPTY && next != 0) {
+            int i2 = (hc-1) & (hashLen-1);
+            int next2 = indexTable[i2];
+            int j2 = next2 & (hashLen-1);
+            indexTable[i2] = (next2 & AVAILABLE_BITS) | CONTROL_OVERFLOW;
+            indexTable[hashLen + j2] = (next & AVAILABLE_BITS) | CONTROL_END;
+            next = 0;
+        }
         // Look if key is already in this map
         int depth = 1;
-        boolean callback = this instanceof FastLinkedHashMap;
-        if (searchForExistingKey) {
-            int k;
-            for (int j = ~next; j >= 0; j = ~indexTable[hashLen+k]) {
-                k = j & (hashLen - 1);
-                if (hcBits == (j & mask)) {
-                    Object o = keyValueTable[k<<keyIndexShift];
-                    if (o == key || o != null && o.equals(key)) {
-                        Object oldValue = keyIndexShift > 0 ?
-                            keyValueTable[(k<<keyIndexShift)+1] :
-                            DUMMY_VALUE;
-                        if (keyIndexShift > 0) keyValueTable[(k<<keyIndexShift)+1] = value;
-                        if (callback) updateHook(k);
+        int mask = AVAILABLE_BITS ^ (hashLen-1);
+        if (searchForExistingKey &&
+            (next & CONTROL_BITS) != CONTROL_EMPTY) {
+            int n = next;
+            while (true) {
+                int cur = n & (hashLen-1);
+                if ((n & mask) == (hc & mask)) {
+                    Object key1 = keyValueTable[(cur<<keyIndexShift)+1];
+                    if (key == key1 || key.equals(key1)) {
+                        Object oldValue;
+                        if (keyIndexShift > 0) {
+                            oldValue = keyValueTable[(cur<<keyIndexShift)+2];
+                            keyValueTable[(cur<<keyIndexShift)+2] = value;
+                        } else oldValue = DUMMY_VALUE;
+                        if (callback) updateHook(cur);
                         return (V)oldValue;
                     }
                 }
                 depth++;
-                if ((j & END_OF_LIST) != 0) break;
+                if ((n & CONTROL_BITS) == CONTROL_OVERFLOW)
+                    n = indexTable[hashLen+cur];
+                else if ((n & CONTROL_BITS) == CONTROL_NEXT)
+                    n = indexTable[(i+1) & (hashLen-1)];
+                else break;
             }
         }
         // Resize if needed
@@ -505,7 +586,6 @@ public class FastHashMap<K,V>
             resize(hashLen<<1);
             i = hc & (hashLen - 1);
             mask = AVAILABLE_BITS ^ (hashLen-1);
-            hcBits = hc & mask;
             next = indexTable[i];
             defragment = false;
         }
@@ -514,12 +594,9 @@ public class FastHashMap<K,V>
         if (firstDeletedIndex >= 0 && !defragment) {
             // First reuse deleted positions
             newIndex = firstDeletedIndex;
-            int di = indexTable[hashLen+firstDeletedIndex];
-            if (di == END_OF_LIST)
+            firstDeletedIndex = indexTable[hashLen+firstDeletedIndex];
+            if (firstDeletedIndex == CONTROL_END)
                 firstDeletedIndex = -1;
-            else
-                firstDeletedIndex = di-1;
-            if (next >= 0) indexTable[hashLen+newIndex] = 0;
             modCount++;
         } else {
             newIndex = firstEmptyIndex;
@@ -527,41 +604,68 @@ public class FastHashMap<K,V>
         }
         // Defragment
         if (defragment) {
-            int j = ~next;
-            next = ~((j & ~(hashLen-1)) | firstEmptyIndex);
+            // Move to new continuous space
+            int j = next;
+            next = (j & ~(hashLen-1)) | firstEmptyIndex;
             while (true) {
                 int k = j & (hashLen - 1);
-                Object tmp = keyValueTable[k<<keyIndexShift];
-                keyValueTable[firstEmptyIndex<<keyIndexShift] = tmp;
-                keyValueTable[k<<keyIndexShift] = null;
+                Object tmp = keyValueTable[(k<<keyIndexShift)+1];
+                keyValueTable[(firstEmptyIndex<<keyIndexShift)+1] = tmp;
+                keyValueTable[(k<<keyIndexShift)+1] = null;
                 if (keyIndexShift > 0) {
-                    tmp = keyValueTable[(k<<keyIndexShift)+1];
-                    keyValueTable[(firstEmptyIndex<<keyIndexShift)+1] = tmp;
-                    keyValueTable[(k<<keyIndexShift)+1] = null;
+                    tmp = keyValueTable[(k<<keyIndexShift)+2];
+                    keyValueTable[(firstEmptyIndex<<keyIndexShift)+2] = tmp;
+                    keyValueTable[(k<<keyIndexShift)+2] = null;
                 }
-                boolean last = (j & END_OF_LIST) != 0;
-                int n = last ? 0 : indexTable[hashLen+k];
+                int nextIndex, n;
+                if ((j & CONTROL_BITS) == CONTROL_OVERFLOW) {
+                    nextIndex = hashLen+k;
+                    n = indexTable[nextIndex];
+                } else if ((j & CONTROL_BITS) == CONTROL_NEXT) {
+                    nextIndex = (i+1) & (hashLen-1);
+                    n = indexTable[nextIndex] | CONTROL_END;
+                    indexTable[nextIndex] = 0;
+                    next = (next & AVAILABLE_BITS) | CONTROL_OVERFLOW;
+                } else {
+                    nextIndex = -1;
+                    n = 0;
+                }
                 indexTable[hashLen+k] = firstDeletedIndex < 0 ?
-                    END_OF_LIST : firstDeletedIndex+1;
+                    CONTROL_END : firstDeletedIndex;
                 firstDeletedIndex = k;
                 if (callback) relocateHook(firstEmptyIndex, k);
                 firstEmptyIndex++;
-                if (last) break;
-                j = ~n;
+                if (nextIndex < 0) break;
+                j = n;
                 indexTable[hashLen + firstEmptyIndex - 1] =
-                    ~((j & ~(hashLen-1)) | firstEmptyIndex);
+                    (j & ~(hashLen-1)) | firstEmptyIndex;
             }
         }
         // Insert it
-        keyValueTable[newIndex<<keyIndexShift] = key;
-        if (keyIndexShift > 0) keyValueTable[(newIndex<<keyIndexShift)+1] = value;
-        if (next < 0) indexTable[hashLen + newIndex] = next;
-        indexTable[i] = ~(newIndex | hcBits | (next < 0 ? 0 : END_OF_LIST));
+        keyValueTable[(newIndex<<keyIndexShift)+1] = key;
+        if (keyIndexShift > 0)
+            keyValueTable[(newIndex<<keyIndexShift)+2] = value;
+        if ((next & CONTROL_BITS) == CONTROL_END && newIndex != 0 && indexTable[(i+1)&(hashLen-1)] == 0) {
+            indexTable[i] = (next & AVAILABLE_BITS) | CONTROL_NEXT;
+            indexTable[(i+1)&(hashLen-1)] = newIndex | (hc & mask); // | CONTROL_EMPTY;
+        } else if ((next & CONTROL_BITS) == CONTROL_EMPTY) {
+            indexTable[i] = newIndex | (hc & mask) | CONTROL_END;
+        } else if ((next & CONTROL_BITS) == CONTROL_NEXT) {
+            int i2 = (i+1) & (hashLen-1);
+            int next2 = indexTable[i2];
+            indexTable[i2] = 0;
+            indexTable[hashLen + (next & (hashLen-1))] = next2 | CONTROL_END;
+            indexTable[hashLen + newIndex] = (next & AVAILABLE_BITS) | CONTROL_OVERFLOW;
+            indexTable[i] = newIndex | (hc & mask) | CONTROL_OVERFLOW;
+        } else { // CONTROL_OVERFLOW and CONTROL_END
+            indexTable[hashLen + newIndex] = next;
+            indexTable[i] = newIndex | (hc & mask) | CONTROL_OVERFLOW;
+        }
         //
         size++;
         modCount++;
         if (callback) addHook(newIndex);
-        // if (defragment) validate();
+        // validate("Put "+key+" "+value);
         return null;
     }
 
@@ -575,7 +679,7 @@ public class FastHashMap<K,V>
      *         previously associated <tt>null</tt> with <tt>key</tt>.)
      */
     public V remove(Object key) {
-        V result = removeKey(key, -1);
+        V result = removeKey(key, -2);
         return result == NOT_FOUND ? null : result;
     }
 
@@ -589,59 +693,91 @@ public class FastHashMap<K,V>
      *
      * @param key key whose mapping is to be removed from the map
      * @param index index of element to delete if it is >= 0
-     * @return NOT_FOUND or old value if index >= 0
-     * if index < 0 return value is undefined (usually null)
+     * @return NOT_FOUND or old value if index >= -1
+     * if index < -1 return value is undefined (usually null)
      */
     @SuppressWarnings("unchecked")
     final V removeKey(Object key, int index) {
-        if (indexTable == null) return (V)NOT_FOUND;
+        // Null special case
+        if (key == null) {
+            if (nullKeyPresent) {
+                nullKeyPresent = false;
+                size--;
+                removeHook(-1);
+                if (keyIndexShift > 0) {
+                    V oldValue = (V)keyValueTable[0];
+                    keyValueTable[0] = null;
+                    return oldValue;
+                } else return (V)DUMMY_VALUE;
+            } else return (V)NOT_FOUND;
+        }
+        // Lazy array allocation check
+        if (indexTable == null || keyValueTable == null)
+            return (V)NOT_FOUND;
+        // Compute hash index
         int hc = hash(key);
-        int mask = AVAILABLE_BITS ^ (hashLen-1);
-        int hcBits = hc & mask;
         int prev = -1;
         int curr = hc & (hashLen-1);
-        for (int i = ~indexTable[curr]; i >= 0; i = ~indexTable[curr]) {
+        // Check if this hash bin is empty
+        int i = indexTable[curr];
+        if ((i & CONTROL_BITS) == CONTROL_EMPTY)
+            return (V)NOT_FOUND;
+        // Search
+        int mask = AVAILABLE_BITS ^ (hashLen-1);
+        while (true) {
             int j = i & (hashLen-1);
             int k = hashLen + j;
-            if (hcBits == (i & mask)) {
+            if ((hc & mask) == (i & mask)) {
                 boolean found;
-                if (index < 0) {
-                    Object o = keyValueTable[j<<keyIndexShift];
-                    found = o == key || o != null && o.equals(key);
+                if (index < -1) {
+                    Object o = keyValueTable[(j<<keyIndexShift)+1];
+                    found = o == key || key.equals(o);
                 } else {
                     found = j == index;
                 }
                 if (found) {
                     size--;
-                    if((i & END_OF_LIST) != 0) {
-                        if (prev >= 0)
-                            indexTable[prev] ^= END_OF_LIST;
-                        else
-                            indexTable[curr] = 0;
-                    } else {
+                    if((i & CONTROL_BITS) == CONTROL_OVERFLOW) {
                         indexTable[curr] = indexTable[k];
+                    } else {
+                        if ((i & CONTROL_BITS) == CONTROL_NEXT) {
+                            int c2 = (curr+1) & (hashLen-1);
+                            int i2 = indexTable[c2];
+                            indexTable[curr] = i2 | CONTROL_END; // & AVAILABLE_BITS
+                            indexTable[c2] = 0;
+                        } else {
+                            if (prev >= 0)
+                                indexTable[prev] |= CONTROL_END; // (indexTable[prev] & AVAILABLE_BITS)
+                            if (prev < 0 || (i & CONTROL_BITS) == CONTROL_EMPTY)
+                                indexTable[curr] = 0;
+                        }
                     }
                     if (j == firstEmptyIndex-1) {
                         firstEmptyIndex = j;
                     } else {
                         indexTable[k] = firstDeletedIndex < 0 ?
-                            END_OF_LIST : firstDeletedIndex+1;
+                            CONTROL_END : firstDeletedIndex;
                         firstDeletedIndex = j;
                     }
-                    Object oldValue = index >= 0 ? null :
+                    Object oldValue = index >= -1 ? null :
                         keyIndexShift == 0 ? DUMMY_VALUE :
-                        keyValueTable[(j<<keyIndexShift)+1];
-                    keyValueTable[j<<keyIndexShift] = null;
+                        keyValueTable[(j<<keyIndexShift)+2];
+                    keyValueTable[(j<<keyIndexShift)+1] = null;
                     if (keyIndexShift > 0)
-                        keyValueTable[(j<<keyIndexShift)+1] = null;
+                        keyValueTable[(j<<keyIndexShift)+2] = null;
                     modCount++;
                     removeHook(j);
+                    // validate("Remove "+key+", "+index);
                     return (V)oldValue;
                 }
             }
-            if ((i & END_OF_LIST) != 0) break;
             prev = curr;
-            curr = k;
+            if ((i & CONTROL_BITS) == CONTROL_OVERFLOW)
+                curr = k;
+            else if ((i & CONTROL_BITS) == CONTROL_NEXT)
+                curr = (curr+1) & (hashLen-1);
+            else break;
+            i = indexTable[curr];
         }
         return (V)NOT_FOUND;
     }
@@ -651,14 +787,15 @@ public class FastHashMap<K,V>
      * The map will be empty after this call returns.
      */
     public void clear() {
-        if (keyValueTable != null)
-            Arrays.fill(keyValueTable, 0, firstEmptyIndex<<keyIndexShift, null);
         if (indexTable != null)
             Arrays.fill(indexTable, 0, hashLen + firstEmptyIndex, 0);
+        if (keyValueTable != null)
+            Arrays.fill(keyValueTable, 0, (firstEmptyIndex<<keyIndexShift)+1, null);
         size = 0;
         firstEmptyIndex = 0;
         firstDeletedIndex = -1;
         modCount++;
+        nullKeyPresent = false;
     }
 
     /**
@@ -674,10 +811,10 @@ public class FastHashMap<K,V>
             that = (FastHashMap<K,V>)super.clone();
         } catch (CloneNotSupportedException e) {
         }
-        if (keyValueTable != null)
-            that.keyValueTable = keyValueTable.clone();
         if (indexTable != null)
-            that.indexTable = indexTable.clone();
+            that.indexTable = Arrays.copyOf(indexTable, hashLen+threshold);
+        if (keyValueTable != null)
+            that.keyValueTable = Arrays.copyOf(keyValueTable, (threshold<<keyIndexShift)+1);
         that.keySet = null;
         that.values = null;
         that.entrySet = null;
@@ -723,7 +860,10 @@ public class FastHashMap<K,V>
     @SuppressWarnings("unchecked")
     public V get(Object key) {
         int i = positionOf(key);
-        return i < 0 ? null : (V)(keyIndexShift > 0 ? keyValueTable[(i<<keyIndexShift)+1] : DUMMY_VALUE);
+        return i < -1 ? null :
+            (V)(keyIndexShift > 0 ?
+                keyValueTable[(i<<keyIndexShift)+2] :
+                DUMMY_VALUE);
     }
 
     /**
@@ -735,7 +875,7 @@ public class FastHashMap<K,V>
      * key.
      */
     public boolean containsKey(Object key) {
-        return positionOf(key) >= 0;
+        return positionOf(key) >= -1;
     }
 
     /**
@@ -764,10 +904,10 @@ public class FastHashMap<K,V>
             FastHashMap<K,V> fm = (FastHashMap<K,V>)m;
             for (int i = fm.iterateFirst(); i >= 0; i = fm.iterateNext(i)) {
                 @SuppressWarnings("unchecked")
-                K key = (K)fm.keyValueTable[i<<fm.keyIndexShift];
+                K key = (K)fm.keyValueTable[(i<<fm.keyIndexShift)+1];
                 @SuppressWarnings("unchecked")
                 V value = (V)(fm.keyIndexShift > 0 ?
-                    fm.keyValueTable[(i<<fm.keyIndexShift)+1] :
+                    fm.keyValueTable[(i<<fm.keyIndexShift)+2] :
                     DUMMY_VALUE);
                 put(key, value);
             }
@@ -786,11 +926,16 @@ public class FastHashMap<K,V>
      *         specified value
      */
     public boolean containsValue(Object value) {
+        // Check arrays lazy allocation
+        if (keyValueTable == null || size == 0)
+            return false;
+        // No values in table special case
         if (keyIndexShift == 0)
             return size > 0 && value == DUMMY_VALUE;
-        for (int i = 0; i < firstEmptyIndex ; i++)
+        // Search
+        for (int i = -1; i < firstEmptyIndex ; i++)
             if (!isEmpty(i)) { // Not deleted
-                Object o = keyValueTable[(i<<keyIndexShift)+1];
+                Object o = keyValueTable[(i<<keyIndexShift)+2];
                 if (o == value || o != null && o.equals(value))
                     return true;
             }
@@ -831,7 +976,8 @@ public class FastHashMap<K,V>
      * @return  index of the first element.
      */
     int iterateFirst() {
-        if (size == 0) return -1;
+        if (size == 0) return -2;
+        if (nullKeyPresent) return -1;
         int i = 0;
         while(isEmpty(i)) i++;
         return i;
@@ -846,7 +992,7 @@ public class FastHashMap<K,V>
      */
     int iterateNext(int i) {
         do i++; while (i < firstEmptyIndex && isEmpty(i));
-        return i < firstEmptyIndex ? i : -1;
+        return i < firstEmptyIndex ? i : -2;
     }
 
     /**
@@ -856,17 +1002,17 @@ public class FastHashMap<K,V>
     private abstract class HashIterator<E> implements Iterator<E> {
         boolean simpleOrder = firstDeletedIndex < 0 &&
             !(FastHashMap.this instanceof FastLinkedHashMap);
-        int nextIndex = size == 0 ? -1 :
-            simpleOrder ? 0 : iterateFirst();
-        int lastIndex = -1;
+        int nextIndex = size == 0 ? -2 :
+            simpleOrder ? (nullKeyPresent ? -1 : 0) : iterateFirst();
+        int lastIndex = -2;
         int expectedModCount = modCount; // For fast-fail
         public final boolean hasNext() {
-            return nextIndex >= 0 && nextIndex < firstEmptyIndex;
+            return nextIndex >= -1 && nextIndex < firstEmptyIndex;
         }
         public final E next() {
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
-            if (nextIndex < 0 || nextIndex >= firstEmptyIndex)
+            if (nextIndex < -1 || nextIndex >= firstEmptyIndex)
                 throw new NoSuchElementException();
             lastIndex = nextIndex;
             if (simpleOrder)
@@ -876,12 +1022,13 @@ public class FastHashMap<K,V>
             return value();
         }
         public final void remove() {
-            if (lastIndex < 0)
+            if (lastIndex < -1)
                 throw new IllegalStateException();
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
-            removeKey(keyValueTable[lastIndex<<keyIndexShift], lastIndex);
-            lastIndex = -1;
+            removeKey(lastIndex == -1 ? null :
+                keyValueTable[(lastIndex<<keyIndexShift)+1], lastIndex);
+            lastIndex = -2;
             expectedModCount = modCount;
         }
         abstract E value();
@@ -890,7 +1037,8 @@ public class FastHashMap<K,V>
     private final class KeyIterator extends HashIterator<K> {
         @SuppressWarnings("unchecked")
         K value() {
-            return (K)keyValueTable[lastIndex<<keyIndexShift];
+            return lastIndex == -1 ? null :
+                (K)keyValueTable[(lastIndex<<keyIndexShift)+1];
         }
     }
 
@@ -908,7 +1056,7 @@ public class FastHashMap<K,V>
             return containsKey(o);
         }
         public boolean remove(Object o) {
-            return FastHashMap.this.removeKey(o, -1) != NOT_FOUND;
+            return FastHashMap.this.removeKey(o, -2) != NOT_FOUND;
         }
         public void clear() {
           FastHashMap.this.clear();
@@ -952,9 +1100,9 @@ public class FastHashMap<K,V>
             @SuppressWarnings("unchecked")
             Map.Entry<K,V> e = (Map.Entry<K,V>) o;
             int i = positionOf(e.getKey());
-            if (i < 0) return false;
+            if (i < -1) return false;
             Object v1 = keyIndexShift > 0 ?
-                keyValueTable[(i<<keyIndexShift)+1] :
+                keyValueTable[(i<<keyIndexShift)+2] :
                 DUMMY_VALUE;
             Object v2 = e.getValue();
             return v1 == v2 || v1 != null && v1.equals(v2);
@@ -966,9 +1114,9 @@ public class FastHashMap<K,V>
             Map.Entry<K,V> e = (Map.Entry<K,V>) o;
             K key = e.getKey();
             int i = positionOf(key);
-            if (i < 0) return false;
+            if (i < -1) return false;
             Object v1 = keyIndexShift > 0 ?
-                keyValueTable[(i<<keyIndexShift)+1] :
+                keyValueTable[(i<<keyIndexShift)+2] :
                 DUMMY_VALUE;
             Object v2 = e.getValue();
             if (v1 != v2 && (v1 == null || !v1.equals(v2)))
@@ -1008,7 +1156,9 @@ public class FastHashMap<K,V>
     private final class ValueIterator extends HashIterator<V> {
         @SuppressWarnings("unchecked")
         V value() {
-            return (V)(keyIndexShift > 0 ? keyValueTable[(lastIndex<<keyIndexShift)+1] : DUMMY_VALUE);
+            return (V)(keyIndexShift > 0 ?
+                    keyValueTable[(lastIndex<<keyIndexShift)+2] :
+                    DUMMY_VALUE);
         }
     }
 
@@ -1055,8 +1205,10 @@ public class FastHashMap<K,V>
 
         // Write out keys and values (alternating)
         for (int i = iterateFirst(); i >= 0; i = iterateNext(i)) {
-            s.writeObject(keyValueTable[i<<keyIndexShift]);
-            s.writeObject(keyIndexShift > 0 ? keyValueTable[(i<<keyIndexShift)+1] : null);
+            s.writeObject(i == -1 ? null :
+                keyValueTable[(i<<keyIndexShift)+1]);
+            s.writeObject(keyIndexShift > 0 ?
+                keyValueTable[(i<<keyIndexShift)+2] : null);
         }
     }
 
@@ -1075,7 +1227,7 @@ public class FastHashMap<K,V>
         // Read in number of buckets and allocate the bucket array;
         hashLen = s.readInt();
         keyIndexShift = 1;
-        keyValueTable = new Object[threshold<<keyIndexShift];
+        keyValueTable = new Object[(threshold<<keyIndexShift)+1];
         indexTable = new int[hashLen+threshold];
         firstDeletedIndex = -1;
 
@@ -1101,9 +1253,10 @@ public class FastHashMap<K,V>
         @SuppressWarnings("unchecked")
         Entry(int index) {
             this.index = index;
-            this.key = (K)keyValueTable[index<<keyIndexShift];
+            this.key = index == -1 ? null :
+                (K)keyValueTable[(index<<keyIndexShift)+1];
             this.value = (V)(keyIndexShift > 0 ?
-                keyValueTable[(index<<keyIndexShift)+1] :
+                keyValueTable[(index<<keyIndexShift)+2] :
                 DUMMY_VALUE);
         }
         public final K getKey() {
@@ -1111,15 +1264,17 @@ public class FastHashMap<K,V>
         }
         @SuppressWarnings("unchecked")
         public final V getValue() {
-            if(keyIndexShift > 0 && keyValueTable[index<<keyIndexShift] == key)
-                value = (V)keyValueTable[(index<<keyIndexShift)+1];
+            if(keyIndexShift > 0 && (index == -1 ? nullKeyPresent :
+                keyValueTable[(index<<keyIndexShift)+1] == key))
+                value = (V)keyValueTable[(index<<keyIndexShift)+2];
             return value;
         }
         public final V setValue(V newValue) {
-            if(keyIndexShift > 0 && keyValueTable[index<<keyIndexShift] == key) {
+            if(keyIndexShift > 0 && (index == -1 ? nullKeyPresent :
+                keyValueTable[(index<<keyIndexShift)+1] == key)) {
                 @SuppressWarnings("unchecked")
-                V oldValue = (V)keyValueTable[(index<<keyIndexShift)+1];
-                keyValueTable[(index<<keyIndexShift)+1] = value = newValue;
+                V oldValue = (V)keyValueTable[(index<<keyIndexShift)+2];
+                keyValueTable[(index<<keyIndexShift)+2] = value = newValue;
                 return oldValue;
             }
             V oldValue = value;
@@ -1159,24 +1314,63 @@ public class FastHashMap<K,V>
 
     /**
      * Internal self-test.
-    void validate() {
-        int numberOfKeys = 0;
+    void validate(String s) {
+        int numberOfKeys = nullKeyPresent ? 1 : 0;
         for (int i = 0; i < hashLen; i++) {
-            int index = ~indexTable[i];
-            while (index >= 0) {
-                Object key = keyValueTable[(index & (hashLen-1))<<keyIndexShift];
-                int hc = hash(key);
+            int index = indexTable[i];
+            // Another hash bin?
+            if (index != 0 && (index & CONTROL_BITS) == CONTROL_EMPTY) {
+                int i2 = (i-1) & (hashLen-1);
+                if ((indexTable[i2] & CONTROL_BITS) != CONTROL_NEXT)
+                    throw new RuntimeException("Next at position "+i+" is incorrect");
+            }
+            if ((index & CONTROL_BITS) == CONTROL_EMPTY) continue;
+            // Check first cell
+            int cur = index & (hashLen-1);
+            if (cur >= threshold)
+                throw new RuntimeException("Bad index "+cur+" in hash bin "+i);
+            Object key = keyValueTable[(cur<<keyIndexShift)+1];
+            int mask = AVAILABLE_BITS ^ (hashLen-1);
+            int hc = hash(key);
+            if ((hc & (hashLen-1)) != i)
+                throw new RuntimeException("Key "+key+" is in wrong hash basket ("+
+                    i+") must be "+(hc & (hashLen-1))+". "+s);
+            if ((hc & mask) != (index & mask))
+                throw new RuntimeException("Key "+key+" has incorrect hashcode bits");
+            numberOfKeys++;
+            // Check next cell
+            if ((index & CONTROL_BITS) == CONTROL_NEXT) {
+                int i1 = (i+1) & (hashLen-1);
+                int index1 = indexTable[i1];
+                if (index1 == 0)
+                    throw new RuntimeException("Next for "+i+" is 0. "+s);
+                if ((index1 & CONTROL_BITS) != CONTROL_EMPTY)
+                    throw new RuntimeException("Next for "+i+" has wrong control bits. "+s);
+                key = keyValueTable[((index1 & (hashLen-1))<<keyIndexShift)+1];
+                hc = hash(key);
                 if ((hc & (hashLen-1)) != i)
-                    throw new RuntimeException("Key "+key+" is in wrong hash basket ("+
+                    throw new RuntimeException("Next key "+key+" is in wrong hash basket ("+
                         i+") must be "+(hc & (hashLen-1)));
-                int mask = AVAILABLE_BITS ^ (hashLen-1);
-                if ((hc & mask) != (index & mask))
-                    throw new RuntimeException("Key "+key+" has incorrect hashcode bits");
+                if ((hc & mask) != (index1 & mask))
+                    throw new RuntimeException("Next key "+key+" has incorrect hashcode bits");
                 numberOfKeys++;
-                if ((index & END_OF_LIST) != 0) break;
-                index = ~indexTable[hashLen+(index & (hashLen-1))];
-                if (index < 0)
-                    throw new RuntimeException("END_OF_LIST bit not set in basket "+i);
+            }
+            // Check overflow
+            while ((index & CONTROL_BITS) == CONTROL_OVERFLOW) {
+                index = indexTable[hashLen+cur];
+                if ((index & CONTROL_BITS) == CONTROL_EMPTY)
+                    throw new RuntimeException("Incorrect CONTROL_EMPTY in hash basket "+i+" overflow. "+s);
+                if ((index & CONTROL_BITS) == CONTROL_NEXT)
+                    throw new RuntimeException("Incorrect CONTROL_NEXT in hash basket "+i+" overflow. "+s);
+                cur = index & (hashLen-1);
+                key = keyValueTable[(cur<<keyIndexShift)+1];
+                hc = hash(key);
+                if ((hc & (hashLen-1)) != i)
+                    throw new RuntimeException("Overflow key "+key+" is in wrong hash basket ("+
+                        i+") must be "+(hc & (hashLen-1)));
+                if ((hc & mask) != (index & mask))
+                    throw new RuntimeException("Overflow key "+key+" has incorrect hashcode bits");
+                numberOfKeys++;
             }
         }
         if (numberOfKeys != size)
@@ -1185,13 +1379,12 @@ public class FastHashMap<K,V>
         int i = firstDeletedIndex;
         while (i >= 0) {
             numberOfDeletedIndices++;
-            int nextDeleted = indexTable[hashLen+i];
-            if (nextDeleted == END_OF_LIST) break;
-            if (nextDeleted < 1)
-                throw new RuntimeException("Incorrect entry in deleted list ("+nextDeleted+")");
-            i = nextDeleted-1;
+            i = indexTable[hashLen+i];
+            if (i == CONTROL_END) break;
+            if (i >= threshold || i < 0)
+                throw new RuntimeException("Incorrect entry in deleted list ("+i+")");
         }
-        if (numberOfDeletedIndices != firstEmptyIndex - size)
+        if (numberOfDeletedIndices != firstEmptyIndex - size + (nullKeyPresent ? 1 : 0))
             throw new RuntimeException("Deleted # ("+numberOfDeletedIndices+
                 ") must be "+(firstEmptyIndex - size));
     }
@@ -1216,11 +1409,11 @@ public class FastHashMap<K,V>
      */
     public int hashCode() {
         int h = 0;
-        for (int i = 0; i < firstEmptyIndex; i++)
+        for (int i = -1; i < firstEmptyIndex; i++)
             if (!isEmpty(i)) {
-                Object key = keyValueTable[i<<keyIndexShift];
+                Object key = i == -1 ? null : keyValueTable[(i<<keyIndexShift)+1];
                 Object value = keyIndexShift > 0 ?
-                    keyValueTable[(i<<keyIndexShift)+1] :
+                    keyValueTable[(i<<keyIndexShift)+2] :
                     DUMMY_VALUE;
                 int hc = 0;
                 if (key != null) hc ^= key.hashCode();
@@ -1248,14 +1441,14 @@ public class FastHashMap<K,V>
         StringBuilder sb = new StringBuilder();
         sb.append('{');
         boolean first = true;
-        for (int i = iterateFirst(); i >= 0; i = iterateNext(i)) {
+        for (int i = iterateFirst(); i >= -1; i = iterateNext(i)) {
             if (first)
                 first = false;
             else
                 sb.append(", ");
-            Object key = keyValueTable[i<<keyIndexShift];
+            Object key = i == -1 ? null : keyValueTable[(i<<keyIndexShift)+1];
             Object value = keyIndexShift > 0 ?
-                keyValueTable[(i<<keyIndexShift)+1] :
+                keyValueTable[(i<<keyIndexShift)+2] :
                 DUMMY_VALUE;
             sb.append(key   == this ? "(this Map)" : key);
             sb.append('=');
@@ -1294,11 +1487,11 @@ public class FastHashMap<K,V>
         Map<K,V> m = (Map<K,V>) o;
         if (m.size() != size)
             return false;
-        for (int i = 0; i < firstEmptyIndex; i++)
+        for (int i = -1; i < firstEmptyIndex; i++)
             if (!isEmpty(i)) {
-                Object key = keyValueTable[i<<keyIndexShift];
+                Object key = i == -1 ? null : keyValueTable[(i<<keyIndexShift)+1];
                 Object value = keyIndexShift > 0 ?
-                    keyValueTable[(i<<keyIndexShift)+1] :
+                    keyValueTable[(i<<keyIndexShift)+2] :
                     DUMMY_VALUE;
                 if (value == null) {
                     if (!(m.get(key)==null && m.containsKey(key)))

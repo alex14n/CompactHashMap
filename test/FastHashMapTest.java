@@ -191,7 +191,7 @@ public class FastHashMapTest {
 
   @Test public void testClone () {
     FastHashMap<String,String> map = new FastHashMap<String,String> ();
-    map.put("a","b");
+    map.put("a", "b");
     Set<String> mapKeys = map.keySet();
     FastHashMap<String,String> clone = map.clone();
     clone.put("a", "c");
@@ -247,7 +247,7 @@ public class FastHashMapTest {
 
   @Test public void testEntrySetValue () {
     FastHashMap<String,String> map = new FastHashMap<String,String> ();
-    map.put("a","b");
+    map.put("a", "b");
     Map.Entry<String,String> entry = map.entrySet().iterator().next();
     assertEquals("b", entry.setValue("x"));
     assertEquals("x", map.get("a"));
@@ -523,5 +523,20 @@ public class FastHashMapTest {
     e.setValue("b");
     assertTrue(entrySet.remove(e));
     assertFalse(m.containsKey("a"));
+  }
+
+  @Test public void testEntrySetSize () {
+    Map<String,String> map = new FastHashMap<String,String>();
+    map.put("hello", "world");
+    map.put("world", "hello");
+    Set<Map.Entry<String,String>> set =
+      new HashSet<Map.Entry<String,String>>(map.entrySet());
+    assertEquals(2, set.size());
+    assertEquals(2*("hello".hashCode() ^ "world".hashCode()), set.hashCode());
+  }
+
+  @Test public void testEmptyContainsValue () {
+    Map<String,String> map = new FastHashMap<String,String>();
+    assertFalse(map.containsValue("test"));
   }
 }

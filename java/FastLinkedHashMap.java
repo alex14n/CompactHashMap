@@ -129,7 +129,7 @@ public class FastLinkedHashMap<K,V>
      *
      * @serial
      */
-    private final boolean accessOrder;
+    final boolean accessOrder;
 
     /**
      * Index array:
@@ -137,19 +137,19 @@ public class FastLinkedHashMap<K,V>
      * (index of previous element in doubly linked list),
      * odd elements are 'after' (next element index).
      */
-    private transient int[] beforeAfter;
+    transient int[] prevNext;
 
     /**
      * Index of the eldest map element,
      * head of the doubly linked list.
      */
-    private transient int headIndex;
+    transient int headIndex;
 
     /**
      * Cached Entry of the eldest map element
      * for removeEldestEntry speedup.
      */
-    private transient Entry headEntry;
+    transient Entry headEntry;
 
     /**
      * Constructs an empty insertion-ordered <tt>LinkedHashMap</tt> instance
@@ -250,9 +250,11 @@ public class FastLinkedHashMap<K,V>
     @SuppressWarnings("unchecked")
     public V get(Object key) {
         int i = positionOf(key);
-        if(i < 0) return null;
+        if(i < -1) return null;
         updateIndex(i);
-        return (V)(keyIndexShift > 0 ? keyValueTable[(i<<keyIndexShift)+1] : DUMMY_VALUE);
+        return (V)(keyIndexShift > 0 ?
+            keyValueTable[(i<<keyIndexShift)+2] :
+            DUMMY_VALUE);
     }
 
     /**
@@ -261,7 +263,7 @@ public class FastLinkedHashMap<K,V>
      */
     public void clear() {
         super.clear();
-        headIndex = -1;
+        headIndex = -2;
         headEntry = null;
     }
 
@@ -270,10 +272,10 @@ public class FastLinkedHashMap<K,V>
      */
     void resize(int newCapacity) {
         super.resize(newCapacity);
-        if (beforeAfter != null)
-            beforeAfter = Arrays.copyOf(beforeAfter, threshold<<1);
+        if (prevNext != null)
+          prevNext = Arrays.copyOf(prevNext, (threshold+1)<<1);
         else if (threshold > 0)
-          beforeAfter = new int[threshold<<1];
+          prevNext = new int[(threshold+1)<<1];
     }
 
     /**
@@ -284,8 +286,8 @@ public class FastLinkedHashMap<K,V>
      */
     public FastLinkedHashMap<K,V> clone() {
         FastLinkedHashMap<K,V> that = (FastLinkedHashMap<K,V>)super.clone();
-        if (beforeAfter != null)
-            that.beforeAfter = beforeAfter.clone();
+        if (prevNext != null)
+            that.prevNext = Arrays.copyOf(prevNext, (threshold+1)<<1);
         that.headEntry = null;
         return that;
     }
@@ -342,8 +344,8 @@ public class FastLinkedHashMap<K,V>
      */
     void init() {
         if (threshold > 0)
-            beforeAfter = new int[threshold<<1];
-        headIndex = -1;
+          prevNext = new int[(threshold+1)<<1];
+        headIndex = -2;
         headEntry = null;
     }
 
@@ -358,7 +360,7 @@ public class FastLinkedHashMap<K,V>
     void addHook(int i) {
         insertIndex(i);
         //
-        if(headIndex < 0) return;
+        if(headIndex < -1) return;
         if(headEntry == null) {
             headEntry = new Entry(headIndex);
         }
@@ -385,8 +387,8 @@ public class FastLinkedHashMap<K,V>
     @SuppressWarnings("unchecked")
     void updateHook(int i) {
         updateIndex(i);
-        if(headEntry != null && headIndex == i && keyIndexShift > 0)
-            headEntry.value = (V)keyValueTable[(i<<keyIndexShift)+1];
+        if (headEntry != null && headIndex == i && keyIndexShift > 0)
+            headEntry.value = (V)keyValueTable[(i<<keyIndexShift)+2];
     }
 
     /**
@@ -395,15 +397,15 @@ public class FastLinkedHashMap<K,V>
      */
     void relocateHook(int newIndex, int oldIndex) {
         if (size == 1) {
-            beforeAfter[newIndex<<1] =
-            beforeAfter[(newIndex<<1)+1] = newIndex;
+            prevNext[(newIndex<<1)+2] =
+            prevNext[(newIndex<<1)+3] = newIndex;
         } else {
-            int prev = beforeAfter[oldIndex<<1];
-            int next = beforeAfter[(oldIndex<<1)+1];
-            beforeAfter[newIndex<<1] = prev;
-            beforeAfter[(newIndex<<1)+1] = next;
-            beforeAfter[(prev<<1)+1] =
-            beforeAfter[next<<1] = newIndex;
+            int prev = prevNext[(oldIndex<<1)+2];
+            int next = prevNext[(oldIndex<<1)+3];
+            prevNext[(newIndex<<1)+2] = prev;
+            prevNext[(newIndex<<1)+3] = next;
+            prevNext[(prev<<1)+3] =
+            prevNext[(next<<1)+2] = newIndex;
         }
         if (headIndex == oldIndex) {
             headIndex = newIndex;
@@ -418,23 +420,23 @@ public class FastLinkedHashMap<K,V>
     }
 
     int iterateNext(int i) {
-        i = beforeAfter[(i<<1)+1];
-        return i == headIndex ? -1 : i;
+        i = prevNext[(i<<1)+3];
+        return i == headIndex ? -2 : i;
     }
 
     /**
      * Remove index from the linked list.
      */
-    private final void removeIndex(int i) {
+    final void removeIndex(int i) {
         if (size == 0) {
-            headIndex = -1;
+            headIndex = -2;
             headEntry = null;
         } else {
-            int prev = beforeAfter[i<<1];
-            int next = beforeAfter[(i<<1)+1];
-            beforeAfter[next<<1] = prev;
-            beforeAfter[(prev<<1)+1] = next;
-            if(headIndex == i) {
+            int prev = prevNext[(i<<1)+2];
+            int next = prevNext[(i<<1)+3];
+            prevNext[(next<<1)+2] = prev;
+            prevNext[(prev<<1)+3] = next;
+            if (headIndex == i) {
                 headIndex = next;
                 headEntry = null;
             }
@@ -446,17 +448,17 @@ public class FastLinkedHashMap<K,V>
      *
      * @param  i  index
      */
-    private final void insertIndex(int i) {
-        if (headIndex < 0) {
-            beforeAfter[i<<1] =
-            beforeAfter[(i<<1)+1] =
+    final void insertIndex(int i) {
+        if (headIndex < -1) {
+            prevNext[(i<<1)+2] =
+            prevNext[(i<<1)+3] =
             headIndex = i;
         } else {
-            int last = beforeAfter[headIndex<<1];
-            beforeAfter[i<<1] = last;
-            beforeAfter[(i<<1)+1] = headIndex;
-            beforeAfter[headIndex<<1] = i;
-            beforeAfter[(last<<1)+1] = i;
+            int last = prevNext[(headIndex<<1)+2];
+            prevNext[(i<<1)+2] = last;
+            prevNext[(i<<1)+3] = headIndex;
+            prevNext[(headIndex<<1)+2] =
+            prevNext[(last<<1)+3] = i;
         }
     }
 
@@ -466,7 +468,7 @@ public class FastLinkedHashMap<K,V>
      *
      * @param  i  index
      */
-    private final void updateIndex(int i) {
+    final void updateIndex(int i) {
         if(accessOrder) {
             removeIndex(i);
             insertIndex(i);
@@ -476,30 +478,31 @@ public class FastLinkedHashMap<K,V>
 
     /**
      * Internal self-test.
-    void validate() {
-        super.validate();
+    void validate(String s) {
+        super.validate(s);
         if (size == 0) {
-            if (headIndex != -1)
-                throw new RuntimeException("headIndex("+headIndex+") must be -1 in empty map");
+            if (headIndex != -2)
+                throw new RuntimeException("headIndex("+headIndex+") must be -2 in empty map");
             if (headEntry != null)
                 throw new RuntimeException("headEntry must be null in empty map");
         } else {
             if (headEntry != null && headEntry.index != headIndex)
                 throw new RuntimeException("headEntry("+headEntry.index+") must be "+headIndex);
-            if (headEntry != null && headEntry.key != keyValueTable[headIndex<<keyIndexShift])
+            if (headEntry != null && headEntry.key !=
+                (headIndex == -1 ? null : keyValueTable[(headIndex<<keyIndexShift)+1]))
                 throw new RuntimeException("headEntry.key("+headEntry.key+") is incorrect");
             int numberOfEntries = 0;
-            int next = -1;
+            int next = -2;
             for (int i = headIndex; next != headIndex; i = next) {
-                if (i < 0 || i >= firstEmptyIndex || isEmpty(i))
-                    throw new RuntimeException("Empty index "+i+", headIndex="+headIndex);
+                if (i < -1 || i >= firstEmptyIndex || isEmpty(i))
+                    throw new RuntimeException("Empty index "+i+", headIndex="+headIndex+". "+s);
                 numberOfEntries++;
-                next = beforeAfter[(i<<1)+1];
-                if (beforeAfter[next<<1] != i)
-                    throw new RuntimeException("next("+next+").before("+beforeAfter[next<<1]+") != this("+i+")");
+                next = prevNext[(i<<1)+3];
+                if (prevNext[(next<<1)+2] != i)
+                    throw new RuntimeException("next("+next+").before("+prevNext[(next<<1)+2]+") != this("+i+")");
             }
             if (numberOfEntries != size)
-                throw new RuntimeException("numberOfEntries("+numberOfEntries+") != size("+size+")");
+                throw new RuntimeException("numberOfEntries("+numberOfEntries+") != size("+size+"). "+s);
         }
     }
      */

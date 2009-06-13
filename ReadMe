@@ -5,7 +5,7 @@ Strong points:
  * Adding a new key/value is a sequental array write => faster
  * (Scala only) Preserves iteration order:
    if no keys were removed it's the same order they were inserted
-   Java version also breaks iteration order during defragmentation
+   Java version also breaks iteration order on null keys and defragmentation
  * HashCode bits are stored in index array => less random reads when looking for missing key
  * (Scala only) Primitive types are stored in primitive arrays => saves a lot of memory
 
@@ -16,7 +16,7 @@ Weak points:
  * (Scala only) keys and values are stored in different arrays which is slower
  * (Scala only) key remove operation is not optimized
 
-Some discussion:
+Discussions:
 http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-June/001758.html
 http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-June/001763.html
 http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-June/001788.html
