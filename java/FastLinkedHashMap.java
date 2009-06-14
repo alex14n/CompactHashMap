@@ -414,11 +414,11 @@ public class FastLinkedHashMap<K,V>
 
     // Iteration order based on the linked list.
 
-    int iterateFirst() {
+    final int iterateFirst() {
         return headIndex;
     }
 
-    int iterateNext(int i) {
+    final int iterateNext(int i) {
         i = prevNext[(i<<1)+3];
         return i == headIndex ? NO_INDEX : i;
     }

@@ -1074,10 +1074,8 @@ public class FastHashMap<K,V>
      * value() method should return the real elements.
      */
     private abstract class HashIterator<E> implements Iterator<E> {
-        boolean simpleOrder = firstDeletedIndex < 0 &&
-            !(FastHashMap.this instanceof FastLinkedHashMap);
-        int nextIndex = size == 0 ? NO_INDEX :
-            simpleOrder ? (nullKeyPresent ? NULL_INDEX : 0) : iterateFirst();
+        boolean simpleOrder = !(FastHashMap.this instanceof FastLinkedHashMap);
+        int nextIndex = iterateFirst();
         int lastIndex = NO_INDEX;
         int expectedModCount = modCount; // For fast-fail
         public final boolean hasNext() {
@@ -1090,7 +1088,9 @@ public class FastHashMap<K,V>
                 throw new NoSuchElementException();
             lastIndex = nextIndex;
             if (simpleOrder)
-                nextIndex++;
+                do nextIndex++;
+                while (firstDeletedIndex >= 0 && nextIndex < firstEmptyIndex &&
+                    keyValueTable[(nextIndex<<keyIndexShift)+1] == null);
             else
                 nextIndex = iterateNext(nextIndex);
             return value();
@@ -1159,7 +1159,7 @@ public class FastHashMap<K,V>
     }
 
     private final class EntryIterator extends HashIterator<Map.Entry<K,V>> {
-        Map.Entry<K,V> value() {
+        final Map.Entry<K,V> value() {
             return new Entry(lastIndex);
         }
     }
