@@ -12,7 +12,7 @@ final class BadHash {
 
 object Benchmark {
   final case class Result (var count: Int, var total: Long, var min: Long, var minMem: Long)
-  final private[this] val results = CompactHashMap[String,Result] 
+  final private[this] val results = CompactHashMap[String,Result]
 
   private[this] val iterations = 0x180000
   final def intKey(i: Int) = i*123

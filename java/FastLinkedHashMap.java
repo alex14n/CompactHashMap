@@ -250,7 +250,7 @@ public class FastLinkedHashMap<K,V>
     @SuppressWarnings("unchecked")
     public V get(Object key) {
         int i = positionOf(key);
-        if(i < -1) return null;
+        if(i == NO_INDEX) return null;
         updateIndex(i);
         return (V)(keyIndexShift > 0 ?
             keyValueTable[(i<<keyIndexShift)+2] :
@@ -263,7 +263,7 @@ public class FastLinkedHashMap<K,V>
      */
     public void clear() {
         super.clear();
-        headIndex = -2;
+        headIndex = NO_INDEX;
         headEntry = null;
     }
 
@@ -345,7 +345,7 @@ public class FastLinkedHashMap<K,V>
     void init() {
         if (threshold > 0)
           prevNext = new int[(threshold+1)<<1];
-        headIndex = -2;
+        headIndex = NO_INDEX;
         headEntry = null;
     }
 
@@ -421,7 +421,7 @@ public class FastLinkedHashMap<K,V>
 
     int iterateNext(int i) {
         i = prevNext[(i<<1)+3];
-        return i == headIndex ? -2 : i;
+        return i == headIndex ? NO_INDEX : i;
     }
 
     /**
@@ -429,7 +429,7 @@ public class FastLinkedHashMap<K,V>
      */
     final void removeIndex(int i) {
         if (size == 0) {
-            headIndex = -2;
+            headIndex = NO_INDEX;
             headEntry = null;
         } else {
             int prev = prevNext[(i<<1)+2];
@@ -481,20 +481,20 @@ public class FastLinkedHashMap<K,V>
     void validate(String s) {
         super.validate(s);
         if (size == 0) {
-            if (headIndex != -2)
-                throw new RuntimeException("headIndex("+headIndex+") must be -2 in empty map");
+            if (headIndex != NO_INDEX)
+                throw new RuntimeException("headIndex("+headIndex+") must be NO_INDEX in empty map");
             if (headEntry != null)
                 throw new RuntimeException("headEntry must be null in empty map");
         } else {
             if (headEntry != null && headEntry.index != headIndex)
                 throw new RuntimeException("headEntry("+headEntry.index+") must be "+headIndex);
             if (headEntry != null && headEntry.key !=
-                (headIndex == -1 ? null : keyValueTable[(headIndex<<keyIndexShift)+1]))
+                (headIndex == NULL_INDEX ? null : keyValueTable[(headIndex<<keyIndexShift)+1]))
                 throw new RuntimeException("headEntry.key("+headEntry.key+") is incorrect");
             int numberOfEntries = 0;
-            int next = -2;
+            int next = NO_INDEX;
             for (int i = headIndex; next != headIndex; i = next) {
-                if (i < -1 || i >= firstEmptyIndex || isEmpty(i))
+                if (i <= NO_INDEX || i >= firstEmptyIndex || isEmpty(i))
                     throw new RuntimeException("Empty index "+i+", headIndex="+headIndex+". "+s);
                 numberOfEntries++;
                 next = prevNext[(i<<1)+3];

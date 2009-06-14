@@ -217,6 +217,7 @@ public class FastHashMapTest {
     map.put("b","2");
     map.put("c","3");
     map.put("d","4");
+    map.put(null,"5");
     map.remove("a");
     map.remove("d");
 
@@ -243,6 +244,7 @@ public class FastHashMapTest {
     assertEquals("3", read.get("c"));
     assertFalse(read.containsKey("d"));
     assertEquals(map, read);
+    assertEquals("5", read.get(null));
   }
 
   @Test public void testEntrySetValue () {
@@ -538,5 +540,21 @@ public class FastHashMapTest {
   @Test public void testEmptyContainsValue () {
     Map<String,String> map = new FastHashMap<String,String>();
     assertFalse(map.containsValue("test"));
+  }
+
+  @Test public void testPutAllAfterRemove () {
+    FastHashMap<Integer,Integer> map1 = new FastHashMap<Integer,Integer> ();
+    FastHashMap<Integer,Integer> map2 = new FastHashMap<Integer,Integer> ();
+    for (int i = 0; i < 100; i++)
+      map1.put(i, i);
+    for (int i = 0; i < 100; i++)
+      map1.remove(i);
+    assertTrue(map1.isEmpty());
+    for (int i = 0; i < 200; i++)
+      map2.put(i, i);
+    map1.putAll(map2);
+    assertEquals(map2.size(), map1.size());
+    assertEquals(map1, map2);
+    assertEquals(map2, map1);
   }
 }
