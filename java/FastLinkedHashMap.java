@@ -360,7 +360,6 @@ public class FastLinkedHashMap<K,V>
     void addHook(int i) {
         insertIndex(i);
         //
-        if(headIndex < -1) return;
         if(headEntry == null) {
             headEntry = new Entry(headIndex);
         }
@@ -449,7 +448,7 @@ public class FastLinkedHashMap<K,V>
      * @param  i  index
      */
     final void insertIndex(int i) {
-        if (headIndex < -1) {
+        if (headIndex == NO_INDEX) {
             prevNext[(i<<1)+2] =
             prevNext[(i<<1)+3] =
             headIndex = i;
