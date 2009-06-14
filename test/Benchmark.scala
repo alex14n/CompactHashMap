@@ -6,7 +6,14 @@ final class Pos(final val x:Int, final val y:Int) {
   }
 }
 
+final class BadHash {
+  override def hashCode = super.hashCode & 0xFFFFF
+}
+
 object Benchmark {
+  final case class Result (var count: Int, var total: Long, var min: Long, var minMem: Long)
+  final private[this] val results = CompactHashMap[String,Result] 
+
   private[this] val iterations = 0x180000
   final def intKey(i: Int) = i*123
 /*
@@ -14,12 +21,15 @@ object Benchmark {
   val rnd = new java.util.Random
   private[this] val values = (0 to iterations*2).toList map { x => new Pos(rnd.nextInt, rnd.nextInt) } toArray
 
+  type T = BadHash
+  private[this] val values = (0 to iterations*2).toList map { x => new BadHash } toArray
+*/
   type T = Object
   private[this] val values = (0 to iterations*2).toList map { x => new Object } toArray
-*/
+/*
   type T = String
   private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
-/*
+
   type T = Int
   final def values(i: Int) = intKey(i)
 */
@@ -29,15 +39,27 @@ object Benchmark {
   private[this] var troveIntMap: gnu.trove.TIntIntHashMap = _
   private[this] var fastutilIntMap: it.unimi.dsi.fastutil.ints.Int2IntMap = _
 
-  private[this] val rt = Runtime.getRuntime()
+  final private[this] val rt = Runtime.getRuntime()
 
   def doTest (name: String, proc: () => Unit) {
     val t0 = System.currentTimeMillis
     proc ()
     val t = System.currentTimeMillis - t0
     System.gc
+    val mem = rt.totalMemory() - rt.freeMemory()
+    val result = results.getOrElse (name, {
+      val r = Result(0, 0L, t, mem)
+      results(name) = r
+      r } )
+    result.count += 1
+    result.total += t
+    if (t < result.min) result.min = t
+    if (mem < result.minMem) result.minMem = mem
     println (name + " - " + (t / 1000.).formatted("%.3f") + "s; Mem: " +
-      (((rt.totalMemory() - rt.freeMemory()) / 1024. / 1024.) formatted "%.2f") + " Mb")
+      ((mem / 1048576.) formatted "%.2f") + " Mb; avg " +
+      (result.total / 1000. / result.count).formatted("%.3f") + "s; min " +
+      (result.min / 1000.).formatted("%.3f") + "s; minMem " +
+      ((result.minMem / 1048576.) formatted "%.2f") + " Mb")
   }
 
   def scalaWrite (map: scala.collection.mutable.Map[T,T]) {
@@ -178,11 +200,11 @@ object Benchmark {
   }
 
   val tests: List[(String,()=>Unit)] = List(
-    "fastWrite" -> {() => javaWrite(new FastHashMap)},
-    "fastReadFull" -> javaReadFull _,
+    "fastWrite    " -> {() => javaWrite(new FastHashMap(16, .75f))},
+    "fastReadFull " -> javaReadFull _,
     "fastReadEmpty" -> javaReadEmpty _,
-    "javaWrite" -> {() => javaWrite(new java.util.HashMap)},
-    "javaReadFull" -> javaReadFull _,
+    "javaWrite    " -> {() => javaWrite(new java.util.HashMap(16, .75f))},
+    "javaReadFull " -> javaReadFull _,
     "javaReadEmpty" -> javaReadEmpty _,
 /*
     "compactWrite" -> {() => scalaWrite (new CompactHashMap (classOf[T], classOf[T], 16, 0.75f))},
