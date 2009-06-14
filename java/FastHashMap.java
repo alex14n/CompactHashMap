@@ -510,6 +510,66 @@ public class FastHashMap<K,V>
     }
 
     /**
+     * Returns the value to which the specified key is mapped,
+     * or {@code null} if this map contains no mapping for the key.
+     *
+     * <p>More formally, if this map contains a mapping from a key
+     * {@code k} to a value {@code v} such that {@code (key==null ? k==null :
+     * key.equals(k))}, then this method returns {@code v}; otherwise
+     * it returns {@code null}.  (There can be at most one such mapping.)
+     *
+     * <p>A return value of {@code null} does not <i>necessarily</i>
+     * indicate that the map contains no mapping for the key; it's also
+     * possible that the map explicitly maps the key to {@code null}.
+     * The {@link #containsKey containsKey} operation may be used to
+     * distinguish these two cases.
+     *
+     * @see #put(Object, Object)
+     */
+    @SuppressWarnings("unchecked")
+    public V get(Object key) {
+        // Null special case
+        if (key == null)
+            return nullKeyPresent ?
+                (V)(keyIndexShift > 0 ?
+                    keyValueTable[0] :
+                    DUMMY_VALUE) :
+                null;
+        // Check arrays lazy allocation
+        if (indexTable == null)
+            return null;
+        // Compute hash index
+        int hc = hash(key.hashCode());
+        int index = indexTable[hc & (hashLen-1)];
+        // Empty?
+        int control = index & CONTROL_BITS;
+        if (control == CONTROL_EMPTY)
+            return null;
+        // Search
+        int mask = AVAILABLE_BITS ^ (hashLen-1);
+        while (true) {
+            int position = index & (hashLen-1);
+            if ((index & mask) == (hc & mask)) {
+                Object key1 = keyValueTable[(position<<keyIndexShift)+1];
+                if (key == key1 || key.equals(key1))
+                    return (V)(keyIndexShift > 0 ?
+                        keyValueTable[(position<<keyIndexShift)+2] :
+                        DUMMY_VALUE);
+            }
+            // Move forward
+            if (control == CONTROL_END)
+                return null; // END is more frequent - check it first
+            else if (control == CONTROL_OVERFLOW)
+                index = indexTable[hashLen+position];
+            else if (control == CONTROL_NEXT)
+                index = indexTable[(hc+1) & (hashLen-1)];
+            else // CONTROL_EMPTY
+                return null;
+            control = index & CONTROL_BITS;
+        }
+    }
+
+    /**
      * Returns <tt>true</tt> if i-th array position
      * is not occupied (is in deleted elements list).
      *
@@ -879,32 +939,6 @@ public class FastHashMap<K,V>
      */
     public boolean isEmpty() {
         return size == 0;
-    }
-
-    /**
-     * Returns the value to which the specified key is mapped,
-     * or {@code null} if this map contains no mapping for the key.
-     *
-     * <p>More formally, if this map contains a mapping from a key
-     * {@code k} to a value {@code v} such that {@code (key==null ? k==null :
-     * key.equals(k))}, then this method returns {@code v}; otherwise
-     * it returns {@code null}.  (There can be at most one such mapping.)
-     *
-     * <p>A return value of {@code null} does not <i>necessarily</i>
-     * indicate that the map contains no mapping for the key; it's also
-     * possible that the map explicitly maps the key to {@code null}.
-     * The {@link #containsKey containsKey} operation may be used to
-     * distinguish these two cases.
-     *
-     * @see #put(Object, Object)
-     */
-    @SuppressWarnings("unchecked")
-    public V get(Object key) {
-        int i = positionOf(key);
-        return i == NO_INDEX ? null :
-            (V)(keyIndexShift > 0 ?
-                keyValueTable[(i<<keyIndexShift)+2] :
-                DUMMY_VALUE);
     }
 
     /**
