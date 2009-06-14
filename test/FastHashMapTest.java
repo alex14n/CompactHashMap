@@ -534,7 +534,12 @@ public class FastHashMapTest {
     Set<Map.Entry<String,String>> set =
       new HashSet<Map.Entry<String,String>>(map.entrySet());
     assertEquals(2, set.size());
-    assertEquals(2*("hello".hashCode() ^ "world".hashCode()), set.hashCode());
+    int hc = "hello".hashCode() ^ "world".hashCode();
+    assertEquals(2*hc, set.hashCode());
+    map.put(null, "test");
+    assertEquals(2*hc + "test".hashCode(), map.hashCode());
+    map.remove("hello");
+    assertEquals(hc + "test".hashCode(), map.hashCode());
   }
 
   @Test public void testEmptyContainsValue () {

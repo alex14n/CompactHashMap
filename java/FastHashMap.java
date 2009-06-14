@@ -134,9 +134,28 @@ public class FastHashMap<K,V>
      * Bits with control information on where to look for next entry in hash bin.
      */
     final static int CONTROL_BITS     = 0xC0000000;
+
+    /**
+     * This bits are used to mark empty cell.
+     * Also, it's used in 'next' cell, and index must not be zero.
+     * Used only in main hashtable, never in overflow.
+     */
     final static int CONTROL_EMPTY    = 0;
+
+    /**
+     * This bits are used only in main hashtable,
+     * (when next cell is still empty) never in overflow.
+     */
     final static int CONTROL_NEXT     = 0x40000000;
+
+    /**
+     * Next element is in overflow table.
+     */
     final static int CONTROL_OVERFLOW = 0x80000000;
+
+    /**
+     * This bits marks 'end of list'.
+     */
     final static int CONTROL_END      = 0xC0000000;
 
     /**
@@ -1014,7 +1033,7 @@ public class FastHashMap<K,V>
      */
     int iterateNext(int i) {
         do i++; while (i < firstEmptyIndex && isEmpty(i));
-        return i < firstEmptyIndex ? i : -2;
+        return i < firstEmptyIndex ? i : NO_INDEX;
     }
 
     /**
@@ -1512,12 +1531,12 @@ public class FastHashMap<K,V>
             return false;
         for (int i = NULL_INDEX; i < firstEmptyIndex; i++)
             if (!isEmpty(i)) {
-                Object key = i == -1 ? null : keyValueTable[(i<<keyIndexShift)+1];
+                Object key = i == NULL_INDEX ? null : keyValueTable[(i<<keyIndexShift)+1];
                 Object value = keyIndexShift > 0 ?
                     keyValueTable[(i<<keyIndexShift)+2] :
                     DUMMY_VALUE;
                 if (value == null) {
-                    if (!(m.get(key)==null && m.containsKey(key)))
+                    if (!(m.get(key) == null && m.containsKey(key)))
                         return false;
                 } else {
                     Object value2 = m.get(key);
