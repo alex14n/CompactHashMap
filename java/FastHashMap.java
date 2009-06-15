@@ -1068,14 +1068,19 @@ public class FastHashMap<K,V>
      * Generic iterator over this map.
      * value() method should return the real elements.
      */
-    private abstract class HashIterator<E> implements Iterator<E> {
+    final class HashIterator<E> implements Iterator<E> {
         boolean simpleOrder = !(FastHashMap.this instanceof FastLinkedHashMap);
         int nextIndex = iterateFirst();
         int lastIndex = NO_INDEX;
         int expectedModCount = modCount; // For fast-fail
+        int iteratorType;
+        HashIterator(int iteratorType) {
+            this.iteratorType = iteratorType;
+        }
         public final boolean hasNext() {
             return nextIndex != NO_INDEX && nextIndex < firstEmptyIndex;
         }
+        @SuppressWarnings("unchecked")
         public final E next() {
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
@@ -1088,7 +1093,16 @@ public class FastHashMap<K,V>
                     keyValueTable[(nextIndex<<keyIndexShift)+1] == null);
             else
                 nextIndex = iterateNext(nextIndex);
-            return value();
+            switch (iteratorType) {
+                case KEY_ITERATOR:
+                    return lastIndex == NULL_INDEX ? null :
+                      (E)keyValueTable[(lastIndex<<keyIndexShift)+1];
+                case ENTRY_ITERATOR:
+                    return (E)new Entry(lastIndex);
+                default: // VALUE_ITERATOR
+                    // HashSet (keyIndexShift==0) uses only keySet
+                    return (E)keyValueTable[(lastIndex<<1)+2];
+            }
         }
         public final void remove() {
             if (lastIndex == NO_INDEX)
@@ -1100,20 +1114,16 @@ public class FastHashMap<K,V>
             lastIndex = NO_INDEX;
             expectedModCount = modCount;
         }
-        abstract E value();
     }
 
-    private final class KeyIterator extends HashIterator<K> {
-        @SuppressWarnings("unchecked")
-        K value() {
-            return lastIndex == NULL_INDEX ? null :
-                (K)keyValueTable[(lastIndex<<keyIndexShift)+1];
-        }
-    }
+    // Iterator types
+    final static int KEY_ITERATOR = 0;
+    final static int ENTRY_ITERATOR = 1;
+    final static int VALUE_ITERATOR = 2;
 
     private final class KeySet extends AbstractSet<K> {
         public Iterator<K> iterator() {
-            return new KeyIterator();
+            return new HashIterator<K>(KEY_ITERATOR);
         }
         public int size() {
             return size;
@@ -1153,15 +1163,9 @@ public class FastHashMap<K,V>
         return es != null ? es : (entrySet = new EntrySet());
     }
 
-    private final class EntryIterator extends HashIterator<Map.Entry<K,V>> {
-        final Map.Entry<K,V> value() {
-            return new Entry(lastIndex);
-        }
-    }
-
     private final class EntrySet extends AbstractSet<Map.Entry<K,V>> {
         public Iterator<Map.Entry<K,V>> iterator() {
-            return new EntryIterator();
+            return new HashIterator<Map.Entry<K,V>>(ENTRY_ITERATOR);
         }
         public boolean contains(Object o) {
             if (!(o instanceof Map.Entry))
@@ -1219,17 +1223,9 @@ public class FastHashMap<K,V>
         return (vs != null ? vs : (values = new Values()));
     }
 
-    private final class ValueIterator extends HashIterator<V> {
-        @SuppressWarnings("unchecked")
-        V value() {
-            // HashSet (keyIndexShift==0) uses only keySet
-            return (V)keyValueTable[(lastIndex<<1)+2];
-        }
-    }
-
     private final class Values extends AbstractCollection<V> {
         public Iterator<V> iterator() {
-            return new ValueIterator();
+            return new HashIterator<V>(VALUE_ITERATOR);
         }
         public int size() {
             return size;
