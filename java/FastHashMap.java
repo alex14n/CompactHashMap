@@ -446,9 +446,8 @@ public class FastHashMap<K,V>
                 }
             }
             // Copy deleted list
-            for (int i = firstDeletedIndex; i >= 0 && i != CONTROL_END;) {
-                i = (newIndices[newCapacity + i] = indexTable[hashLen + i]);
-            }
+            for (int i = firstDeletedIndex; i >= 0;
+                i = (newIndices[newCapacity + i] = indexTable[hashLen + i]));
         }
         hashLen = newCapacity;
         threshold = newValueLen;
@@ -688,8 +687,6 @@ public class FastHashMap<K,V>
             // First reuse deleted positions
             newIndex = firstDeletedIndex;
             firstDeletedIndex = indexTable[hashLen+firstDeletedIndex];
-            if (firstDeletedIndex == CONTROL_END)
-                firstDeletedIndex = -1;
             modCount++;
         } else {
             newIndex = firstEmptyIndex;
@@ -727,8 +724,7 @@ public class FastHashMap<K,V>
                     nextIndex = -1;
                     n = 0;
                 }
-                indexTable[hashLen+k] = firstDeletedIndex < 0 ?
-                    CONTROL_END : firstDeletedIndex;
+                indexTable[hashLen+k] = firstDeletedIndex;
                 firstDeletedIndex = k;
                 if (callback) relocateHook(firstEmptyIndex, k);
                 firstEmptyIndex++;
@@ -852,8 +848,7 @@ public class FastHashMap<K,V>
                     if (j == firstEmptyIndex-1) {
                         firstEmptyIndex = j;
                     } else {
-                        indexTable[k] = firstDeletedIndex < 0 ?
-                            CONTROL_END : firstDeletedIndex;
+                        indexTable[k] = firstDeletedIndex;
                         firstDeletedIndex = j;
                     }
                     Object oldValue = index != NO_INDEX ? null :
@@ -1453,8 +1448,7 @@ public class FastHashMap<K,V>
         while (i >= 0) {
             numberOfDeletedIndices++;
             i = indexTable[hashLen+i];
-            if (i == CONTROL_END) break;
-            if (i >= threshold || i < 0)
+            if (i >= threshold)
                 throw new RuntimeException("Incorrect entry in deleted list ("+i+")");
         }
         if (numberOfDeletedIndices != firstEmptyIndex - size + (nullKeyPresent ? 1 : 0))
