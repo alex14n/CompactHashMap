@@ -1121,6 +1121,41 @@ public class FastHashMap<K,V>
     final static int ENTRY_ITERATOR = 1;
     final static int VALUE_ITERATOR = 2;
 
+    // For Server VM with -XX:+DoEscapeAnalysis
+    final class EntryIterator implements Iterator<Map.Entry<K,V>> {
+        boolean simpleOrder = !(FastHashMap.this instanceof FastLinkedHashMap);
+        int nextIndex = iterateFirst();
+        int lastIndex = NO_INDEX;
+        int expectedModCount = modCount; // For fast-fail
+        public final boolean hasNext() {
+            return nextIndex != NO_INDEX && nextIndex < firstEmptyIndex;
+        }
+        public final Map.Entry<K,V> next() {
+            if (modCount != expectedModCount)
+                throw new ConcurrentModificationException();
+            if (nextIndex == NO_INDEX || nextIndex >= firstEmptyIndex)
+                throw new NoSuchElementException();
+            lastIndex = nextIndex;
+            if (simpleOrder)
+                do nextIndex++;
+                while (firstDeletedIndex >= 0 && nextIndex < firstEmptyIndex &&
+                    keyValueTable[(nextIndex<<keyIndexShift)+1] == null);
+            else
+                nextIndex = iterateNext(nextIndex);
+            return new Entry(lastIndex);
+        }
+        public final void remove() {
+            if (lastIndex == NO_INDEX)
+                throw new IllegalStateException();
+            if (modCount != expectedModCount)
+                throw new ConcurrentModificationException();
+            removeKey(lastIndex == NULL_INDEX ? null :
+                keyValueTable[(lastIndex<<keyIndexShift)+1], lastIndex);
+            lastIndex = NO_INDEX;
+            expectedModCount = modCount;
+        }
+    }
+
     private final class KeySet extends AbstractSet<K> {
         public Iterator<K> iterator() {
             return new HashIterator<K>(KEY_ITERATOR);
@@ -1165,7 +1200,8 @@ public class FastHashMap<K,V>
 
     private final class EntrySet extends AbstractSet<Map.Entry<K,V>> {
         public Iterator<Map.Entry<K,V>> iterator() {
-            return new HashIterator<Map.Entry<K,V>>(ENTRY_ITERATOR);
+            // return new HashIterator<Map.Entry<K,V>>(ENTRY_ITERATOR);
+            return new EntryIterator();
         }
         public boolean contains(Object o) {
             if (!(o instanceof Map.Entry))
