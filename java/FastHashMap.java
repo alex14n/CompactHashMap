@@ -235,7 +235,7 @@ public class FastHashMap<K,V>
      * Index of the first not occupied position in array.
      * All elements starting with this index are free.
      */
-    transient int firstEmptyIndex = 0;
+    transient int firstUnusedIndex = 0;
 
     /**
      * Index of first element in deleted list,
@@ -568,7 +568,7 @@ public class FastHashMap<K,V>
      * Returns <tt>true</tt> if i-th array position
      * is not occupied (is in deleted elements list).
      *
-     * @param i index in array, must be less than firstEmptyIndex
+     * @param i index in array, must be less than firstUnusedIndex
      * @return <tt>true</tt> if i-th is empty (was deleted)
      */
     final boolean isEmpty(int i) {
@@ -672,7 +672,7 @@ public class FastHashMap<K,V>
             }
         }
         // Resize if needed
-        boolean defragment = depth > 2 && firstEmptyIndex+depth <= threshold;
+        boolean defragment = depth > 2 && firstUnusedIndex+depth <= threshold;
         if (size >= threshold) {
             resize(hashLen<<1);
             i = hc & (hashLen - 1);
@@ -689,22 +689,22 @@ public class FastHashMap<K,V>
             firstDeletedIndex = indexTable[hashLen+firstDeletedIndex];
             modCount++;
         } else {
-            newIndex = firstEmptyIndex;
-            firstEmptyIndex++;
+            newIndex = firstUnusedIndex;
+            firstUnusedIndex++;
         }
         // Defragment
         if (defragment) {
             // Move to new continuous space
             int j = head;
-            head = (j & ~(hashLen-1)) | firstEmptyIndex;
+            head = (j & ~(hashLen-1)) | firstUnusedIndex;
             while (true) {
                 int k = j & (hashLen - 1);
                 Object tmp = keyValueTable[(k<<keyIndexShift)+1];
-                keyValueTable[(firstEmptyIndex<<keyIndexShift)+1] = tmp;
+                keyValueTable[(firstUnusedIndex<<keyIndexShift)+1] = tmp;
                 keyValueTable[(k<<keyIndexShift)+1] = null;
                 if (keyIndexShift > 0) {
                     tmp = keyValueTable[(k<<keyIndexShift)+2];
-                    keyValueTable[(firstEmptyIndex<<keyIndexShift)+2] = tmp;
+                    keyValueTable[(firstUnusedIndex<<keyIndexShift)+2] = tmp;
                     keyValueTable[(k<<keyIndexShift)+2] = null;
                 }
                 int nextIndex, n;
@@ -726,12 +726,12 @@ public class FastHashMap<K,V>
                 }
                 indexTable[hashLen+k] = firstDeletedIndex;
                 firstDeletedIndex = k;
-                if (callback) relocateHook(firstEmptyIndex, k);
-                firstEmptyIndex++;
+                if (callback) relocateHook(firstUnusedIndex, k);
+                firstUnusedIndex++;
                 if (nextIndex < 0) break;
                 j = n;
-                indexTable[hashLen + firstEmptyIndex - 1] =
-                    (j & ~(hashLen-1)) | firstEmptyIndex;
+                indexTable[hashLen + firstUnusedIndex - 1] =
+                    (j & ~(hashLen-1)) | firstUnusedIndex;
             }
         }
         // Insert it
@@ -845,8 +845,8 @@ public class FastHashMap<K,V>
                                 indexTable[curr] = 0;
                         }
                     }
-                    if (j == firstEmptyIndex-1) {
-                        firstEmptyIndex = j;
+                    if (j == firstUnusedIndex-1) {
+                        firstUnusedIndex = j;
                     } else {
                         indexTable[k] = firstDeletedIndex;
                         firstDeletedIndex = j;
@@ -883,11 +883,11 @@ public class FastHashMap<K,V>
      */
     public void clear() {
         if (indexTable != null)
-            Arrays.fill(indexTable, 0, hashLen + firstEmptyIndex, 0);
+            Arrays.fill(indexTable, 0, hashLen + firstUnusedIndex, 0);
         if (keyValueTable != null)
-            Arrays.fill(keyValueTable, 0, (firstEmptyIndex<<keyIndexShift)+1, null);
+            Arrays.fill(keyValueTable, 0, (firstUnusedIndex<<keyIndexShift)+1, null);
         size = 0;
-        firstEmptyIndex = 0;
+        firstUnusedIndex = 0;
         firstDeletedIndex = -1;
         modCount++;
         nullKeyPresent = false;
@@ -1002,7 +1002,7 @@ public class FastHashMap<K,V>
         if (keyIndexShift == 0)
             return size > 0 && value == DUMMY_VALUE;
         // Search
-        for (int i = NULL_INDEX; i < firstEmptyIndex ; i++)
+        for (int i = NULL_INDEX; i < firstUnusedIndex ; i++)
             if (!isEmpty(i)) { // Not deleted
                 Object o = keyValueTable[(i<<keyIndexShift)+2];
                 if (o == value || o != null && o.equals(value))
@@ -1060,8 +1060,8 @@ public class FastHashMap<K,V>
      * @return  index of the next element.
      */
     int iterateNext(int i) {
-        do i++; while (i < firstEmptyIndex && isEmpty(i));
-        return i < firstEmptyIndex ? i : NO_INDEX;
+        do i++; while (i < firstUnusedIndex && isEmpty(i));
+        return i < firstUnusedIndex ? i : NO_INDEX;
     }
 
     /**
@@ -1078,18 +1078,18 @@ public class FastHashMap<K,V>
             this.iteratorType = iteratorType;
         }
         public final boolean hasNext() {
-            return nextIndex != NO_INDEX && nextIndex < firstEmptyIndex;
+            return nextIndex != NO_INDEX && nextIndex < firstUnusedIndex;
         }
         @SuppressWarnings("unchecked")
         public final E next() {
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
-            if (nextIndex == NO_INDEX || nextIndex >= firstEmptyIndex)
+            if (nextIndex == NO_INDEX || nextIndex >= firstUnusedIndex)
                 throw new NoSuchElementException();
             lastIndex = nextIndex;
             if (simpleOrder)
                 do nextIndex++;
-                while (firstDeletedIndex >= 0 && nextIndex < firstEmptyIndex &&
+                while (firstDeletedIndex >= 0 && nextIndex < firstUnusedIndex &&
                     keyValueTable[(nextIndex<<keyIndexShift)+1] == null);
             else
                 nextIndex = iterateNext(nextIndex);
@@ -1128,17 +1128,17 @@ public class FastHashMap<K,V>
         int lastIndex = NO_INDEX;
         int expectedModCount = modCount; // For fast-fail
         public final boolean hasNext() {
-            return nextIndex != NO_INDEX && nextIndex < firstEmptyIndex;
+            return nextIndex != NO_INDEX && nextIndex < firstUnusedIndex;
         }
         public final Map.Entry<K,V> next() {
             if (modCount != expectedModCount)
                 throw new ConcurrentModificationException();
-            if (nextIndex == NO_INDEX || nextIndex >= firstEmptyIndex)
+            if (nextIndex == NO_INDEX || nextIndex >= firstUnusedIndex)
                 throw new NoSuchElementException();
             lastIndex = nextIndex;
             if (simpleOrder)
                 do nextIndex++;
-                while (firstDeletedIndex >= 0 && nextIndex < firstEmptyIndex &&
+                while (firstDeletedIndex >= 0 && nextIndex < firstUnusedIndex &&
                     keyValueTable[(nextIndex<<keyIndexShift)+1] == null);
             else
                 nextIndex = iterateNext(nextIndex);
@@ -1483,9 +1483,9 @@ public class FastHashMap<K,V>
             if (i >= threshold)
                 throw new RuntimeException("Incorrect entry in deleted list ("+i+")");
         }
-        if (numberOfDeletedIndices != firstEmptyIndex - size + (nullKeyPresent ? 1 : 0))
+        if (numberOfDeletedIndices != firstUnusedIndex - size + (nullKeyPresent ? 1 : 0))
             throw new RuntimeException("Deleted # ("+numberOfDeletedIndices+
-                ") must be "+(firstEmptyIndex - size));
+                ") must be "+(firstUnusedIndex - size));
     }
      */
 
@@ -1508,7 +1508,7 @@ public class FastHashMap<K,V>
      */
     public int hashCode() {
         int h = 0;
-        for (int i = NULL_INDEX; i < firstEmptyIndex; i++)
+        for (int i = NULL_INDEX; i < firstUnusedIndex; i++)
             if (!isEmpty(i)) {
                 int hc = i == NULL_INDEX ? 0 :
                     keyValueTable[(i<<keyIndexShift)+1].hashCode();
@@ -1585,7 +1585,7 @@ public class FastHashMap<K,V>
         Map<K,V> m = (Map<K,V>) o;
         if (m.size() != size)
             return false;
-        for (int i = NULL_INDEX; i < firstEmptyIndex; i++)
+        for (int i = NULL_INDEX; i < firstUnusedIndex; i++)
             if (!isEmpty(i)) {
                 Object key = i == NULL_INDEX ? null : keyValueTable[(i<<keyIndexShift)+1];
                 Object value = keyIndexShift > 0 ?

@@ -493,7 +493,7 @@ public class FastLinkedHashMap<K,V>
             int numberOfEntries = 0;
             int next = NO_INDEX;
             for (int i = headIndex; next != headIndex; i = next) {
-                if (i <= NO_INDEX || i >= firstEmptyIndex || isEmpty(i))
+                if (i <= NO_INDEX || i >= firstUnusedIndex || isEmpty(i))
                     throw new RuntimeException("Empty index "+i+", headIndex="+headIndex+". "+s);
                 numberOfEntries++;
                 next = prevNext[(i<<1)+3];
