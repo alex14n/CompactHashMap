@@ -392,15 +392,15 @@ public class FastHashMap<K,V>
         if (indexTable != null) {
             int mask = AVAILABLE_BITS ^ (hashLen-1);
             int newMask = AVAILABLE_BITS ^ (newCapacity-1);
-            for (int i = 0; i < hashLen; i++) {
+            for (int i = hashLen-1; i >= 0; i--) {
                 int j = indexTable[i];
                 if ((j & CONTROL_BITS) == CONTROL_EMPTY) continue;
                 if ((j & CONTROL_BITS) == CONTROL_NEXT) {
-                    int arrayIndex1 = j & (hashLen-1);
-                    int newHashIndex1 = i | (j & (newMask ^ mask));
                     int i2 = (i+1) & (hashLen-1);
                     int j2 = indexTable[i2];
+                    int arrayIndex1 = j  & (hashLen-1);
                     int arrayIndex2 = j2 & (hashLen-1);
+                    int newHashIndex1 = i | (j  & (newMask ^ mask));
                     int newHashIndex2 = i | (j2 & (newMask ^ mask));
                     if (newHashIndex1 == newHashIndex2) {
                         newIndices[newHashIndex1] =
@@ -412,8 +412,8 @@ public class FastHashMap<K,V>
                         newIndices[newHashIndex2] = arrayIndex2 | (j2 & newMask) | CONTROL_END;
                     }
                 } else { // CONTROL_OVERFLOW and CONTROL_END
-                    int next1i = -1, next1v = 0;
-                    int next2i = -1, next2v = 0;
+                    int next1i = -1, next1v = 0, next1n = 0;
+                    int next2i = -1, next2v = 0, next2n = 0;
                     while (true) {
                         int arrayIndex = j & (hashLen-1);
                         int newHashIndex = i | (j & (newMask ^ mask));
@@ -421,12 +421,14 @@ public class FastHashMap<K,V>
                             if (next1i >= 0) {
                                 newIndices[next1i] = next1v | CONTROL_OVERFLOW;
                                 next1i = newCapacity + (next1v & (newCapacity-1));
+                                next1n++;
                             } else next1i = newHashIndex;
                             next1v = arrayIndex | (j & newMask);
                         } else if (newHashIndex == i+hashLen) {
                             if (next2i >= 0) {
                                 newIndices[next2i] = next2v | CONTROL_OVERFLOW;
                                 next2i = newCapacity + (next2v & (newCapacity-1));
+                                next2n++;
                             } else next2i = newHashIndex;
                             next2v = arrayIndex | (j & newMask);
                         } else {
@@ -441,8 +443,24 @@ public class FastHashMap<K,V>
                         if ((j & CONTROL_BITS) == CONTROL_END) break;
                         j = indexTable[hashLen+arrayIndex];
                     }
-                    if (next1i >= 0) newIndices[next1i] = next1v | CONTROL_END;
-                    if (next2i >= 0) newIndices[next2i] = next2v | CONTROL_END;
+                    if (next1i >= 0) {
+                        if (next1n == 1 && i != hashLen-1 &&
+                            (next1v & (hashLen-1)) != 0 &&
+                            newIndices[i+1] == 0) {
+                            newIndices[i] ^= CONTROL_OVERFLOW ^ CONTROL_NEXT;
+                            newIndices[i+1] = next1v;
+                        } else
+                            newIndices[next1i] = next1v | CONTROL_END;
+                    }
+                    if (next2i >= 0) {
+                        if (next2n == 1 && i != hashLen-1 &&
+                            (next2v & (hashLen-1)) != 0 &&
+                            newIndices[i+hashLen+1] == 0) {
+                            newIndices[i+hashLen] ^= CONTROL_OVERFLOW ^ CONTROL_NEXT;
+                            newIndices[i+hashLen+1] = next2v;
+                        } else
+                            newIndices[next2i] = next2v | CONTROL_END;
+                    }
                 }
             }
             // Copy deleted list
@@ -631,19 +649,10 @@ public class FastHashMap<K,V>
             if (keyValueTable == null)
                 keyValueTable = new Object[(threshold<<keyIndexShift)+1];
         }
-        // Check if this cell is occupied by another hash bin
-        int control = head & CONTROL_BITS;
-        if (control == CONTROL_EMPTY && head != 0) {
-            int i2 = (hc-1) & (hashLen-1);
-            int head2 = indexTable[i2];
-            int j2 = head2 & (hashLen-1);
-            indexTable[i2] = (head2 & AVAILABLE_BITS) | CONTROL_OVERFLOW;
-            indexTable[hashLen + j2] = (head & AVAILABLE_BITS) | CONTROL_END;
-            head = 0;
-        }
         // Look if key is already in this map
         int depth = 1;
         int mask = AVAILABLE_BITS ^ (hashLen-1);
+        int control = head & CONTROL_BITS;
         if (control != CONTROL_EMPTY && searchForExistingKey) {
             int index = head;
             while (true) {
@@ -680,6 +689,15 @@ public class FastHashMap<K,V>
             head = indexTable[i];
             control = head & CONTROL_BITS;
             defragment = false;
+        }
+        // Check if this cell is occupied by another hash bin
+        if (control == CONTROL_EMPTY && head != 0) {
+            int i2 = (hc-1) & (hashLen-1);
+            int head2 = indexTable[i2];
+            int j2 = head2 & (hashLen-1);
+            indexTable[i2] = (head2 & AVAILABLE_BITS) | CONTROL_OVERFLOW;
+            indexTable[hashLen + j2] = head | CONTROL_END; // & AVAILABLE_BITS)
+            head = 0;
         }
         // Find a place for new element
         int newIndex;
@@ -1413,6 +1431,7 @@ public class FastHashMap<K,V>
     /**
      * Internal self-test.
     void validate(String s) {
+        if (indexTable == null) return;
         int numberOfKeys = nullKeyPresent ? 1 : 0;
         for (int i = 0; i < hashLen; i++) {
             int index = indexTable[i];
@@ -1420,7 +1439,7 @@ public class FastHashMap<K,V>
             if (index != 0 && (index & CONTROL_BITS) == CONTROL_EMPTY) {
                 int i2 = (i-1) & (hashLen-1);
                 if ((indexTable[i2] & CONTROL_BITS) != CONTROL_NEXT)
-                    throw new RuntimeException("Next at position "+i+" is incorrect");
+                    throw new RuntimeException("Next at position "+i+" is incorrect. "+s);
             }
             if ((index & CONTROL_BITS) == CONTROL_EMPTY) continue;
             // Check first cell
@@ -1431,12 +1450,14 @@ public class FastHashMap<K,V>
             int mask = AVAILABLE_BITS ^ (hashLen-1);
             if (key == null)
                 throw new RuntimeException("Null (empty) key in hash bin "+i+". "+s);
-            int hc = hash(key.hashCode());
-            if ((hc & (hashLen-1)) != i)
-                throw new RuntimeException("Key "+key+" is in wrong hash basket ("+
-                    i+") must be "+(hc & (hashLen-1))+". "+s);
-            if ((hc & mask) != (index & mask))
-                throw new RuntimeException("Key "+key+" has incorrect hashcode bits");
+            if (key != this) {
+                int hc = hash(key.hashCode());
+                if ((hc & (hashLen-1)) != i)
+                    throw new RuntimeException("Key "+key+" is in wrong hash basket ("+
+                        i+") must be "+(hc & (hashLen-1))+". "+s);
+                if ((hc & mask) != (index & mask))
+                    throw new RuntimeException("Key "+key+" has incorrect hashcode bits");
+            }
             numberOfKeys++;
             // Check next cell
             if ((index & CONTROL_BITS) == CONTROL_NEXT) {
@@ -1447,12 +1468,14 @@ public class FastHashMap<K,V>
                 if ((index1 & CONTROL_BITS) != CONTROL_EMPTY)
                     throw new RuntimeException("Next for "+i+" has wrong control bits. "+s);
                 key = keyValueTable[((index1 & (hashLen-1))<<keyIndexShift)+1];
-                hc = hash(key.hashCode());
-                if ((hc & (hashLen-1)) != i)
-                    throw new RuntimeException("Next key "+key+" is in wrong hash basket ("+
-                        i+") must be "+(hc & (hashLen-1)));
-                if ((hc & mask) != (index1 & mask))
-                    throw new RuntimeException("Next key "+key+" has incorrect hashcode bits");
+                if (key != this) {
+                    int hc = hash(key.hashCode());
+                    if ((hc & (hashLen-1)) != i)
+                        throw new RuntimeException("Next key "+key+" is in wrong hash basket ("+
+                            i+") must be "+(hc & (hashLen-1))+". "+s);
+                    if ((hc & mask) != (index1 & mask))
+                        throw new RuntimeException("Next key "+key+" has incorrect hashcode bits");
+                }
                 numberOfKeys++;
             }
             // Check overflow
@@ -1464,12 +1487,14 @@ public class FastHashMap<K,V>
                     throw new RuntimeException("Incorrect CONTROL_NEXT in hash basket "+i+" overflow. "+s);
                 cur = index & (hashLen-1);
                 key = keyValueTable[(cur<<keyIndexShift)+1];
-                hc = hash(key.hashCode());
-                if ((hc & (hashLen-1)) != i)
-                    throw new RuntimeException("Overflow key "+key+" is in wrong hash basket ("+
-                        i+") must be "+(hc & (hashLen-1)));
-                if ((hc & mask) != (index & mask))
-                    throw new RuntimeException("Overflow key "+key+" has incorrect hashcode bits");
+                if (key != this) {
+                    int hc = hash(key.hashCode());
+                    if ((hc & (hashLen-1)) != i)
+                        throw new RuntimeException("Overflow key "+key+" is in wrong hash basket ("+
+                            i+") must be "+(hc & (hashLen-1))+". "+s);
+                    if ((hc & mask) != (index & mask))
+                        throw new RuntimeException("Overflow key "+key+" has incorrect hashcode bits");
+                }
                 numberOfKeys++;
             }
         }
