@@ -848,22 +848,26 @@ public class FastHashMap<K,V>
                     found = j == index;
                 if (found) {
                     size--;
-                    if((i & CONTROL_BITS) == CONTROL_OVERFLOW) {
+                    if((i & CONTROL_BITS) == CONTROL_END) {
+                        if (prev >= 0)
+                            indexTable[prev] |= CONTROL_END; // (indexTable[prev] & AVAILABLE_BITS)
+                        else
+                            indexTable[curr] = 0;
+                    } else if((i & CONTROL_BITS) == CONTROL_OVERFLOW) {
                         indexTable[curr] = indexTable[k];
-                    } else {
-                        if ((i & CONTROL_BITS) == CONTROL_NEXT) {
-                            int c2 = (curr+1) & (hashLen-1);
-                            int i2 = indexTable[c2];
-                            indexTable[curr] = i2 | CONTROL_END; // & AVAILABLE_BITS
-                            indexTable[c2] = 0;
-                        } else {
-                            if (prev >= 0)
-                                indexTable[prev] |= CONTROL_END; // (indexTable[prev] & AVAILABLE_BITS)
-                            if (prev < 0 || (i & CONTROL_BITS) == CONTROL_EMPTY)
-                                indexTable[curr] = 0;
-                        }
+                    } else if ((i & CONTROL_BITS) == CONTROL_NEXT) {
+                        int c2 = (curr+1) & (hashLen-1);
+                        int i2 = indexTable[c2];
+                        indexTable[curr] = i2 | CONTROL_END; // & AVAILABLE_BITS
+                        indexTable[c2] = 0;
+                    } else { // CONTROL_EMPTY
+                        indexTable[prev] |= CONTROL_END; // (indexTable[prev] & AVAILABLE_BITS)
+                        indexTable[curr] = 0;
                     }
-                    if (j == firstUnusedIndex-1) {
+                    if (size == 0) {
+                        firstUnusedIndex = 0;
+                        firstDeletedIndex = -1;
+                    } else if (j == firstUnusedIndex-1) {
                         firstUnusedIndex = j;
                     } else {
                         indexTable[k] = firstDeletedIndex;
