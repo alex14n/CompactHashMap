@@ -11,6 +11,7 @@ final class BadHash {
 }
 
 object Benchmark {
+  final val rnd = new java.util.Random
   final case class Result (var count: Int, var total: Long, var min: Long, var minMem: Long)
   final private[this] val results = CompactHashMap[String,Result]
 
@@ -18,28 +19,39 @@ object Benchmark {
   final def intKey(i: Int) = i*123
 /*
   type T = Pos
-  val rnd = new java.util.Random
   private[this] val values = (0 to iterations*2).toList map { x => new Pos(rnd.nextInt, rnd.nextInt) } toArray
 
   type T = BadHash
   private[this] val values = (0 to iterations*2).toList map { x => new BadHash } toArray
-*/
+
   type T = Object
   private[this] val values = (0 to iterations*2).toList map { x => new Object } toArray
-/*
+*/
   type T = String
-  private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
-
+  // private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
+  final def values(x: Int) = "_test_"+x
+/*
   type T = Int
   final def values(i: Int) = intKey(i)
 */
   private[this] var scalaMap: scala.collection.mutable.Map[T,T] = _
   private[this] var compactMap: CompactHashMap[T,T] = _
   private[this] var javaMap: java.util.Map[T,T] = _
+/*
   private[this] var troveIntMap: gnu.trove.TIntIntHashMap = _
   private[this] var fastutilIntMap: it.unimi.dsi.fastutil.ints.Int2IntMap = _
-
+*/
   final private[this] val rt = Runtime.getRuntime()
+
+  // final def reoder(i: Int): Int = (i & 0xFFFF0000) | ((i & 0xFF00) >>> 8) | ((i & 0xFF) << 8)
+  final val reorder = new Array[Int](iterations)
+  for (i <- 1 until iterations) {
+    val j = i + rnd.nextInt(iterations-i)
+    val a = reorder(i)
+    val b = reorder(j)
+    reorder(j) = if (a > 0) a else i
+    reorder(i) = if (b > 0) b else j
+  }
 
   def doTest (name: String, proc: () => Unit) {
     val t0 = System.currentTimeMillis
@@ -89,6 +101,62 @@ object Benchmark {
     }
   }
 
+  def scalaReadFull {
+    var i = 0
+    while (i < iterations) {
+      val j = reorder(i)
+      assert (scalaMap(values(j)) == values(2*iterations-j))
+      i += 1
+    }
+  }
+
+  def scalaReadEmpty {
+    var i = 0
+    while (i < iterations) {
+      val j = iterations+reorder(i)
+      assert (! scalaMap.contains(values(j)))
+      i += 1
+    }
+    scalaMap = null
+  }
+
+  def compactIntReadFull {
+    var i = 0
+    while (i < iterations) {
+      val j = reorder(i)
+      assert (compactMap.applyIntInt(intKey(j)) == intKey(2*iterations-j))
+      i += 1
+    }
+  }
+
+  def compactIntReadEmpty {
+    var i = iterations
+    while (i < 2*iterations) {
+      assert (! compactMap.containsInt(intKey(i)))
+      i += 1
+    }
+    compactMap = null
+  }
+
+  def javaReadFull {
+    var i = 0
+    while (i < iterations) {
+      val j = reorder(i)
+      assert (javaMap.get(values(j)) == values(2*iterations-j))
+      i += 1
+    }
+  }
+
+  def javaReadEmpty {
+    var i = 0
+    while (i < iterations) {
+      val j = iterations+reorder(i)
+      assert (! javaMap.containsKey(values(j)))
+      i += 1
+    }
+    javaMap = null
+  }
+/*
   def troveIntWrite {
     troveIntMap = new gnu.trove.TIntIntHashMap (12, 0.5f)
     var i = 0
@@ -107,66 +175,10 @@ object Benchmark {
     }
   }
 
-  final def reoder(i: Int): Int = (i & 0xFFFF0000) | ((i & 0xFF00) >>> 8) | ((i & 0xFF) << 8)
-
-  def scalaReadFull {
-    var i = 0
-    while (i < iterations) {
-      val j = reoder(i)
-      assert (scalaMap(values(j)) == values(2*iterations-j))
-      i += 1
-    }
-  }
-
-  def scalaReadEmpty {
-    var i = iterations
-    while (i < 2*iterations) {
-      assert (! scalaMap.contains(values(i)))
-      i += 1
-    }
-    scalaMap = null
-  }
-
-  def compactIntReadFull {
-    var i = 0
-    while (i < iterations) {
-      val j = reoder(i)
-      assert (compactMap.applyIntInt(intKey(j)) == intKey(2*iterations-j))
-      i += 1
-    }
-  }
-
-  def compactIntReadEmpty {
-    var i = iterations
-    while (i < 2*iterations) {
-      assert (! compactMap.containsInt(intKey(i)))
-      i += 1
-    }
-    compactMap = null
-  }
-
-  def javaReadFull {
-    var i = 0
-    while (i < iterations) {
-      val j = reoder(i)
-      assert (javaMap.get(values(j)) == values(2*iterations-j))
-      i += 1
-    }
-  }
-
-  def javaReadEmpty {
-    var i = iterations
-    while (i < 2*iterations) {
-      assert (! javaMap.containsKey(values(i)))
-      i += 1
-    }
-    javaMap = null
-  }
-
   def troveIntReadFull {
     var i = 0
     while (i < iterations) {
-      val j = reoder(i)
+      val j = reorder(i)
       assert (troveIntMap.get(intKey(j)) == intKey(2*iterations-j))
       i += 1
     }
@@ -184,7 +196,7 @@ object Benchmark {
   def fastutilIntReadFull {
     var i = 0
     while (i < iterations) {
-      val j = reoder(i)
+      val j = reorder(i)
       assert (fastutilIntMap.get(intKey(j)) == intKey(2*iterations-j))
       i += 1
     }
@@ -198,7 +210,7 @@ object Benchmark {
     }
     fastutilIntMap = null
   }
-
+*/
   val tests: List[(String,()=>Unit)] = List(
     "fastWrite    " -> {() => javaWrite(new FastHashMap(16, .75f))},
     "fastReadFull " -> javaReadFull _,
