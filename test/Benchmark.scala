@@ -15,7 +15,8 @@ object Benchmark {
   final case class Result (var count: Int, var total: Long, var min: Long, var minMem: Long)
   final private[this] val results = CompactHashMap[String,Result]
 
-  private[this] val iterations = 0x180000
+  private[this] val iterations = 50 // 0x180000
+  private[this] val tries = 500000
   final def intKey(i: Int) = i*123
 /*
   type T = Pos
@@ -23,14 +24,14 @@ object Benchmark {
 
   type T = BadHash
   private[this] val values = (0 to iterations*2).toList map { x => new BadHash } toArray
-
+*/
   type T = Object
   private[this] val values = (0 to iterations*2).toList map { x => new Object } toArray
-*/
+/*
   type T = String
   // private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
   final def values(x: Int) = "_test_"+x
-/*
+
   type T = Int
   final def values(i: Int) = intKey(i)
 */
@@ -92,15 +93,6 @@ object Benchmark {
     }
   }
 
-  def javaWrite (map: java.util.Map[T,T]) {
-    javaMap = map
-    var i = 0
-    while (i < iterations) {
-      javaMap put (values(i), values(2*iterations-i))
-      i += 1
-    }
-  }
-
   def scalaReadFull {
     var i = 0
     while (i < iterations) {
@@ -138,21 +130,55 @@ object Benchmark {
     compactMap = null
   }
 
+  def javaWrite {
+    var t = 0
+    while (t < tries) {
+      javaMap = new java.util.HashMap
+      var i = 0
+      while (i < iterations) {
+        javaMap put (values(i), values(2*iterations-i))
+        i += 1
+      }
+      t += 1
+    }
+  }
+
+  def fastWrite {
+    var t = 0
+    while (t < tries) {
+      javaMap = new FastHashMap
+      var i = 0
+      while (i < iterations) {
+        javaMap put (values(i), values(2*iterations-i))
+        i += 1
+      }
+      t += 1
+    }
+  }
+
   def javaReadFull {
-    var i = 0
-    while (i < iterations) {
-      val j = reorder(i)
-      assert (javaMap.get(values(j)) == values(2*iterations-j))
-      i += 1
+    var t = 0
+    while (t < tries) {
+      var i = 0
+      while (i < iterations) {
+        val j = reorder(i)
+        assert (javaMap.get(values(j)) == values(2*iterations-j))
+        i += 1
+      }
+      t += 1
     }
   }
 
   def javaReadEmpty {
-    var i = 0
-    while (i < iterations) {
-      val j = iterations+reorder(i)
-      assert (! javaMap.containsKey(values(j)))
-      i += 1
+    var t = 0
+    while (t < tries) {
+      var i = 0
+      while (i < iterations) {
+        val j = iterations+reorder(i)
+        assert (! javaMap.containsKey(values(j)))
+        i += 1
+      }
+      t += 1
     }
     javaMap = null
   }
@@ -212,10 +238,10 @@ object Benchmark {
   }
 */
   val tests: List[(String,()=>Unit)] = List(
-    "fastWrite    " -> {() => javaWrite(new FastHashMap(16, .75f))},
+    "fastWrite    " -> fastWrite _,
     "fastReadFull " -> javaReadFull _,
     "fastReadEmpty" -> javaReadEmpty _,
-    "javaWrite    " -> {() => javaWrite(new java.util.HashMap(16, .75f))},
+    "javaWrite    " -> javaWrite _,
     "javaReadFull " -> javaReadFull _,
     "javaReadEmpty" -> javaReadEmpty _,
 /*
