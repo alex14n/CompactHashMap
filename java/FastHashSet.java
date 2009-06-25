@@ -273,7 +273,7 @@ public class FastHashSet<E>
         // Read in HashMap capacity and load factor and create backing HashMap
         int capacity = s.readInt();
         float loadFactor = s.readFloat();
-        map =  this instanceof FastLinkedHashSet ?
+        map =  this instanceof FastLinkedHashSet<?> ?
                new FastLinkedHashMap<E,Object>(capacity, loadFactor, false, false) :
                new FastHashMap<E,Object>(capacity, loadFactor, false);
 

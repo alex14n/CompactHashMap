@@ -990,7 +990,7 @@ public class FastHashMap<K,V>
             } while (newThreshold < mSize);
             resize(newCapacity);
         }
-        if (m instanceof FastHashMap) {
+        if (m instanceof FastHashMap<?,?>) {
             @SuppressWarnings("unchecked")
             FastHashMap<K,V> fm = (FastHashMap<K,V>)m;
             for (int i = fm.iterateFirst(); i != NO_INDEX; i = fm.iterateNext(i)) {
@@ -1091,7 +1091,7 @@ public class FastHashMap<K,V>
      * value() method should return the real elements.
      */
     final class HashIterator<E> implements Iterator<E> {
-        boolean simpleOrder = !(FastHashMap.this instanceof FastLinkedHashMap);
+        boolean simpleOrder = !(FastHashMap.this instanceof FastLinkedHashMap<?,?>);
         int nextIndex = iterateFirst();
         int lastIndex = NO_INDEX;
         int expectedModCount = modCount; // For fast-fail
@@ -1145,7 +1145,7 @@ public class FastHashMap<K,V>
 
     // For Server VM with -XX:+DoEscapeAnalysis
     final class EntryIterator implements Iterator<Map.Entry<K,V>> {
-        boolean simpleOrder = !(FastHashMap.this instanceof FastLinkedHashMap);
+        boolean simpleOrder = !(FastHashMap.this instanceof FastLinkedHashMap<?,?>);
         int nextIndex = iterateFirst();
         int lastIndex = NO_INDEX;
         int expectedModCount = modCount; // For fast-fail
@@ -1226,7 +1226,7 @@ public class FastHashMap<K,V>
             return new EntryIterator();
         }
         public boolean contains(Object o) {
-            if (!(o instanceof Map.Entry))
+            if (!(o instanceof Map.Entry<?,?>))
                 return false;
             @SuppressWarnings("unchecked")
             Map.Entry<K,V> e = (Map.Entry<K,V>) o;
@@ -1238,7 +1238,7 @@ public class FastHashMap<K,V>
             return v1 == v2 || v1 != null && v1.equals(v2);
         }
         public boolean remove(Object o) {
-            if (!(o instanceof Map.Entry))
+            if (!(o instanceof Map.Entry<?,?>))
                 return false;
             @SuppressWarnings("unchecked")
             Map.Entry<K,V> e = (Map.Entry<K,V>) o;
@@ -1402,7 +1402,7 @@ public class FastHashMap<K,V>
             return oldValue;
         }
         public boolean equals(Object o) {
-            if (!(o instanceof Map.Entry))
+            if (!(o instanceof Map.Entry<?,?>))
                 return false;
             @SuppressWarnings("unchecked")
             Map.Entry<K,V> that = (Map.Entry<K,V>)o;
@@ -1608,7 +1608,7 @@ public class FastHashMap<K,V>
     public boolean equals(Object o) {
         if (o == this)
             return true;
-        if (!(o instanceof Map))
+        if (!(o instanceof Map<?,?>))
             return false;
         @SuppressWarnings("unchecked")
         Map<K,V> m = (Map<K,V>) o;
