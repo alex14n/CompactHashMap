@@ -515,6 +515,16 @@ public class FastHashMapTest {
     assertEquals(m3, m2);
   }
 
+  @Test public void testBigResize2 () {
+    Map<Integer,String> m1 = new FastHashMap<Integer,String>();
+    Map<Integer,String> m2 = new FastHashMap<Integer,String>();
+    for(int i = 0; i < 16; i++)
+      m1.put(i<<16, ""+i);
+    m2.putAll(m1);
+    for(int i = 0; i < 40; i++)
+      m2.put(i, ""+i);
+  }
+
   @Test public void testEntrySetRemove () {
     Map<String,String> m = new FastHashMap<String,String>();
     Set<Map.Entry<String,String>> entrySet = m.entrySet();

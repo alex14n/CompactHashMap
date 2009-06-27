@@ -386,7 +386,7 @@ public class FastHashMap<K,V>
         if (keyValueTable != null)
             keyValueTable = Arrays.copyOf(keyValueTable, (newValueLen<<keyIndexShift)+1);
         else
-            keyValueTable = new Object[newValueLen<<keyIndexShift];
+            keyValueTable = new Object[(newValueLen<<keyIndexShift)+1];
         int[] newIndices = new int[newCapacity+newValueLen];
         if (indexTable != null) {
             int mask = AVAILABLE_BITS ^ (hashLen-1);
@@ -1512,7 +1512,7 @@ public class FastHashMap<K,V>
         }
         if (numberOfDeletedIndices != firstUnusedIndex - size + (nullKeyPresent ? 1 : 0))
             throw new RuntimeException("Deleted # ("+numberOfDeletedIndices+
-                ") must be "+(firstUnusedIndex - size));
+                ") must be "+(firstUnusedIndex - size)+", "+s);
     }
      */
 
