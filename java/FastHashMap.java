@@ -383,11 +383,10 @@ public class FastHashMap<K,V>
     void resize(int newCapacity) {
         // New storage allocation
         int newValueLen = (int)(newCapacity * loadFactor);
-        Object[] newKeyValues;
         if (keyValueTable != null)
-            newKeyValues = Arrays.copyOf(keyValueTable, (newValueLen<<keyIndexShift)+1);
+            keyValueTable = Arrays.copyOf(keyValueTable, (newValueLen<<keyIndexShift)+1);
         else
-            newKeyValues = new Object[newValueLen<<keyIndexShift];
+            keyValueTable = new Object[newValueLen<<keyIndexShift];
         int[] newIndices = new int[newCapacity+newValueLen];
         if (indexTable != null) {
             int mask = AVAILABLE_BITS ^ (hashLen-1);
@@ -469,7 +468,6 @@ public class FastHashMap<K,V>
         }
         hashLen = newCapacity;
         threshold = newValueLen;
-        keyValueTable = newKeyValues;
         indexTable = newIndices;
         // validate("Resize");
     }
