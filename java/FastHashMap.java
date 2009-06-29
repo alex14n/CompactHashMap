@@ -1434,6 +1434,19 @@ public class FastHashMap<K,V>
      * Internal self-test.
     void validate(String s) {
         if (indexTable == null) return;
+        // Check allocation
+        if (threshold != (int)(hashLen*loadFactor))
+            throw new RuntimeException("threshold ("+threshold+
+                ") must be "+(int)(hashLen*loadFactor)+". "+s);
+        if (indexTable.length != hashLen+threshold)
+            throw new RuntimeException("indexTable.length ("+indexTable.length+
+                ") must be "+(hashLen+threshold)+". "+s);
+        if (keyValueTable.length != (threshold<<keyIndexShift)+1)
+            throw new RuntimeException("keyValueTable.length ("+keyValueTable.length+
+                ") must be "+((threshold<<keyIndexShift)+1)+". "+s);
+        if (!nullKeyPresent && keyValueTable[0] != null)
+            throw new RuntimeException("Null value without null key. "+s);
+        //
         int numberOfKeys = nullKeyPresent ? 1 : 0;
         for (int i = 0; i < hashLen; i++) {
             int index = indexTable[i];
@@ -1505,6 +1518,9 @@ public class FastHashMap<K,V>
         int numberOfDeletedIndices = 0;
         int i = firstDeletedIndex;
         while (i >= 0) {
+            if (keyValueTable[(i<<keyIndexShift)+1] != null ||
+                keyIndexShift > 0 && keyValueTable[(i<<keyIndexShift)+2] != null)
+                throw new RuntimeException("Deleted key/value not nulled at "+i+". "+s);
             numberOfDeletedIndices++;
             i = indexTable[hashLen+i];
             if (i >= threshold)
