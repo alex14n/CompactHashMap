@@ -362,7 +362,7 @@ public class FastHashMapTest {
     myHashtableCopy.get("key");
   }
 
-  private static void testMap(Map<Object,Object> m) {
+  static void testMap(Map<Object,Object> m) {
     assertEquals("{}", m.toString());
     m.put("Harvey", m);
     assertEquals("{Harvey=(this Map)}", m.toString());

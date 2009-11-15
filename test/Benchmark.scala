@@ -22,13 +22,13 @@ object Benchmark {
 /*
   type T = Pos
   private[this] val values = (0 to iterations*2).toList map { x => new Pos(rnd.nextInt, rnd.nextInt) } toArray
-
+*/
   type T = BadHash
   private[this] val values = (0 to iterations*2).toList map { x => new BadHash } toArray
-*/
+/*
   type T = Object
   private[this] val values = (0 to iterations*2).toList map { x => new Object } toArray
-/*
+
   type T = String
   // private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
   final def values(x: Int) = "_test_"+x
@@ -194,6 +194,27 @@ object Benchmark {
     }
   }
 
+  def fast2Write {
+    var map: java.util.Map[T,T] = null
+    var i = 0
+    while (i < iterations) {
+      val key = values(i)
+      val value = values(2*iterations-i)
+      var t = 0
+      while (t < tries) {
+        if (i == 0) {
+          map = new FastHashMap2[T,T]
+          maps(t) = map
+        } else {
+          map = maps(t)
+        }
+        map put (key, value)
+        t += 1
+      }
+      i += 1
+    }
+  }
+
   def javaReadFull {
     var i = 0
     while (i < iterations) {
@@ -284,6 +305,9 @@ object Benchmark {
     "fastWrite       " -> fastWrite _,
     "fastReadFull    " -> javaReadFull _,
     "fastReadEmpty   " -> javaReadEmpty _,
+    "fast2Write      " -> fast2Write _,
+    "fast2ReadFull   " -> javaReadFull _,
+    "fast2ReadEmpty  " -> javaReadEmpty _,
     "javaWrite       " -> javaWrite _,
     "javaReadFull    " -> javaReadFull _,
     "javaReadEmpty   " -> javaReadEmpty _,

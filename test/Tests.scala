@@ -11,6 +11,11 @@ object Tests {
   def suppressForAnything: Collection[Method] = Collections.emptySet()
   def suite: Test = {
     val suite = new TestSuite()
+    // Rec Utils
+    suite.addTest(new JUnit4TestAdapter(classOf[WordExtractorTest]))
+    suite.addTest(new JUnit4TestAdapter(classOf[AggregateStatTest]))
+    suite.addTest(new JUnit4TestAdapter(classOf[IntStrTest]))
+    suite.addTest(new JUnit4TestAdapter(classOf[AlternateTest]))
     // Scala collections
     suite.addTest(new JUnit4TestAdapter(classOf[CompactHashSetTest]))
     suite.addTest(new JUnit4TestAdapter(classOf[CompactHashMapTest]))
@@ -19,6 +24,7 @@ object Tests {
     suite.addTest(new JUnit4TestAdapter(classOf[FastHashSetTest]))
     suite.addTest(new JUnit4TestAdapter(classOf[FastLinkedHashMapTest]))
     suite.addTest(new JUnit4TestAdapter(classOf[FastLinkedHashSetTest]))
+    suite.addTest(new JUnit4TestAdapter(classOf[FastHashMap2Test]))
     // Google tests
     suite.addTest(MapTestSuiteBuilder
         .using(new TestStringMapGenerator() {
@@ -75,6 +81,21 @@ object Tests {
             SetFeature.GENERAL_PURPOSE,
             CollectionFeature.ALLOWS_NULL_VALUES,
             CollectionFeature.KNOWN_ORDER,
+            CollectionSize.ANY)
+        .suppressing(suppressForAnything)
+        .createTestSuite());
+    suite.addTest(MapTestSuiteBuilder
+        .using(new TestStringMapGenerator() {
+            override def create(entries: Array[Entry[String,String]]): Map[String,String] = {
+              val map = new FastHashMap2[String,String]
+              for(e <- entries) map.put(e.getKey, e.getValue)
+              map
+          }})
+        .named("FastHashMap2")
+        .withFeatures(
+            MapFeature.GENERAL_PURPOSE,
+            MapFeature.ALLOWS_NULL_KEYS,
+            MapFeature.ALLOWS_NULL_VALUES,
             CollectionSize.ANY)
         .suppressing(suppressForAnything)
         .createTestSuite());

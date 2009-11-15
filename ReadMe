@@ -22,6 +22,7 @@ http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-June/001763.html
 http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-June/001788.html
 http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-June/001809.html
 http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-June/001827.html
+http://mail.openjdk.java.net/pipermail/core-libs-dev/2009-October/003106.html
 http://www.nabble.com/CompactHashMap-ts23358808.html
 http://forums.sun.com/thread.jspa?messageID=10716110
 
@@ -99,3 +100,75 @@ troveInt* is TIntIntHashMap (2.0.4) with 0.5 load factor, http://trove4j.sourcef
 *Write is adding a new key/value mapping
 *ReadFull is reading an existing key/value mapping
 *ReadEmpty is looking for a non-existing key
+
+
+MapMicroBenchmark results:
+http://gee.cs.oswego.edu/cgi-bin/viewcvs.cgi/jsr166/src/test/loops/
+
+
+Standard java.util.HashMap (jdk7b74):
+
+Type/Size:      9     36    144    576   2304   9216  36864 147456 589824
+Object         62     49     42     45     48     63    225    334    609
+String         65     61     52     57     57    100    249    333    384
+Integer        63     46     39     44     43     63    190    271    320
+Long           64     52     46     48     49     65    189    277    322
+Float          65     52     47     51     52     61    228    305    371
+Double         58     59     45     47     53     66    224    315    347
+BigInteger     70     63     56     63     66    159    345    446    488
+BigDecimal     66     65     55     56     57    108    265    352    369
+RandomInt      67     58     48     51     53     74    282    372    407
+Mixed          82     63     65     72     99    249    356    420    479
+
+average        66     56     49     53     57    100    255    342    409
+
+
+HashMapV2 by Doug Lea:
+
+Type/Size:      9     36    144    576   2304   9216  36864 147456 589824
+Object         83     59     55     60     63     74    217    340    384
+String         68     68     62     70     70     97    254    337    599
+Integer        64     47     51     51     50     58    142    223    260
+Long           68     56     52     54     56     62    144    224    255
+Float          80     54     63     67     66     68    229    269    360
+Double         65     63     53     55     70     76    207    294    310
+BigInteger     89     71     68     76     80    156    342    431    476
+BigDecimal     71     73     69     69     72    107    244    353    339
+RandomInt      74     61     60     63     70     88    277    375    409
+Mixed          85     77     78     85    112    248    365    425    474
+
+average        74     62     61     65     70    103    242    327    386
+
+
+FastHashMap:
+
+Type/Size:      9     36    144    576   2304   9216  36864 147456 589824
+Object         78     54     65     50     54     59    178    309    342
+String         71     60     56     61     62     80    237    345    370
+Integer        69     53     52     53     54     55    161    284    311
+Long           66     47     43     49     48     51    157    276    310
+Float          74     52     53     59     54     60    175    288    329
+Double         64     56     50     49     57     59    199    316    330
+BigInteger     78     61     63     78     71    130    329    439    494
+BigDecimal     73     67     62     60     62     88    257    343    372
+RandomInt      83     61     63     59     64     73    244    352    384
+Mixed          84     70     71     75    110    236    336    397    469
+
+average        74     58     57     59     63     89    227    334    371
+
+
+FastHashMap2:
+
+Type/Size:      9     36    144    576   2304   9216  36864 147456 589824
+Object         79     62     60     63     65     75    205    341    387
+String         75     71     67     74     73     99    251    351    399
+Integer        74     60     58     61     60     66    157    252    301
+Long           66     51     49     51     53     60    149    238    283
+Float          85     62     67     73     72     73    210    281    345
+Double         74     67     62     63     71     77    204    302    318
+BigInteger     90     80     78     84     87    153    341    441    688
+BigDecimal     80     78     77     76     78    110    265    363    372
+RandomInt      86     72     72     73     76     91    268    383    411
+Mixed          94     84     85     92    120    249    362    427    480
+
+average        80     68     67     71     75    105    241    337    398
