@@ -11,11 +11,6 @@ object Tests {
   def suppressForAnything: Collection[Method] = Collections.emptySet()
   def suite: Test = {
     val suite = new TestSuite()
-    // Rec Utils
-    suite.addTest(new JUnit4TestAdapter(classOf[WordExtractorTest]))
-    suite.addTest(new JUnit4TestAdapter(classOf[AggregateStatTest]))
-    suite.addTest(new JUnit4TestAdapter(classOf[IntStrTest]))
-    suite.addTest(new JUnit4TestAdapter(classOf[AlternateTest]))
     // Scala collections
     suite.addTest(new JUnit4TestAdapter(classOf[CompactHashSetTest]))
     suite.addTest(new JUnit4TestAdapter(classOf[CompactHashMapTest]))
