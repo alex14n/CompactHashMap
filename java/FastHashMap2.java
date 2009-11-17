@@ -310,14 +310,12 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
     final private int findFreeSpot(int i, int mask) {
 	Object[] kv = keyValueTable;
 
-	//
-	if (i < mask && kv[(i + 1) << 1] == null)
-	    return i + 1;
-	if (i > 0 && kv[(i - 1) << 1] == null)
-	    return i - 1;
-
-	//
 	while (true) {
+	    if (i < mask && kv[(i + 1) << 1] == null)
+		return i + 1;
+	    if (i > 0 && kv[(i - 1) << 1] == null)
+		return i - 1;
+
 	    // i = nextProbe(i) & mask;
 	    // i = (i * 5 + 1) & mask;
 	    i = ((i << 4) + i + 1) & mask;
