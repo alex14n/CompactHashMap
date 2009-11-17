@@ -15,20 +15,20 @@ object Benchmark {
   final case class Result (var count: Int, var total: Long, var min: Long, var minMem: Long)
   final private[this] val results = CompactHashMap[String,Result]
 
-  private[this] val iterations = 50 // 0x180000
-  private[this] val tries = 50000
+  private[this] val iterations = 0x180000
+  private[this] val tries = 1
   private[this] val maps = new Array[java.util.Map[T,T]](tries)
   final def intKey(i: Int) = i*123
 /*
   type T = Pos
   private[this] val values = (0 to iterations*2).toList map { x => new Pos(rnd.nextInt, rnd.nextInt) } toArray
-*/
+
   type T = BadHash
   private[this] val values = (0 to iterations*2).toList map { x => new BadHash } toArray
-/*
+*/
   type T = Object
   private[this] val values = (0 to iterations*2).toList map { x => new Object } toArray
-
+/*
   type T = String
   // private[this] val values = (0 to iterations*2).toList map { x => "_test_"+x } toArray
   final def values(x: Int) = "_test_"+x

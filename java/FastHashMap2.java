@@ -51,6 +51,11 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
 	return get(key, null);
     }
 
+    /**
+     * @param key
+     * @param notFoundValue
+     * @return
+     */
     private final V get(Object key, V notFoundValue) {
 	// since null in keyValueTable represents an empty cell
 	// we have to handle null keys as a special case
@@ -87,8 +92,17 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
 	    return notFoundValue;
 
 	//
-	while (true) {
-	    if ((ci & hcMask) == (hc & hcMask)) {
+	int hcBits = hc & hcMask;
+	if ((ci & hcMask) == hcBits && key.equals(key1)) {
+	    @SuppressWarnings("unchecked")
+	    V result = (V) kv[(i << 1) + 1];
+	    return result;
+	}
+
+	//
+	while ((i = ci & mask) != i0) {
+	    ci = indices[i];
+	    if ((ci & hcMask) == hcBits) {
 		key1 = kv[i << 1];
 		if (key == key1 || key.equals(key1)) {
 		    @SuppressWarnings("unchecked")
@@ -96,10 +110,6 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
 		    return result;
 		}
 	    }
-	    int i2 = ci & mask;
-	    if (i2 == i0)
-		break;
-	    ci = indices[i = i2];
 	}
 
 	// Look in old-style Entry-based overflow (very huge maps)
@@ -141,9 +151,8 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
 	int mask = indices.length - 1;
 	int hc = hash(key.hashCode());
 	int hcMask = ~mask & AVAILABLE_BITS;
+	int i0 = hc & mask, i = i0;
 	int hcBits = hc & hcMask;
-	int i0 = hc & mask;
-	int i = i0;
 
 	//
 	Object key1 = kv[i << 1];
@@ -151,7 +160,6 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
 	    @SuppressWarnings("unchecked")
 	    V oldValue = (V) kv[(i << 1) + 1];
 	    kv[(i << 1) + 1] = value;
-	    indices[i] = (indices[i] & ~hcMask) | hcBits; // update hc bits
 	    return oldValue;
 	}
 
@@ -177,22 +185,23 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
 
 	// OK, now we know that this hash bin is not empty => search
 	while (true) {
-	    if (key1 == key || (ci & hcMask) == hcBits && key.equals(key1)) {
-		@SuppressWarnings("unchecked")
-		V oldValue = (V) kv[(i << 1) + 1];
-		kv[(i << 1) + 1] = value;
-		indices[i] = (ci & ~hcMask) | hcBits; // update hc bits
-		return oldValue;
+	    if ((ci & hcMask) == hcBits) {
+		key1 = kv[i << 1];
+		if (key1 == key || key.equals(key1)) {
+		    @SuppressWarnings("unchecked")
+		    V oldValue = (V) kv[(i << 1) + 1];
+		    kv[(i << 1) + 1] = value;
+		    return oldValue;
+		}
 	    }
 	    int next = ci & mask;
 	    if (next == i0)
 		break;
 	    ci = indices[i = next];
-	    key1 = kv[i << 1];
 	}
 
 	// So, hash chain is not empty but our key was not found => insert
-	int newIndex = findFreeSpot(i);
+	int newIndex = findFreeSpot(i, mask);
 	indices[newIndex] = FOREIGN | hcBits | (c0 & mask);
 	indices[i0] = (c0 & ~mask) | newIndex;
 	kv[newIndex << 1] = key;
@@ -206,7 +215,7 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
     /**
      *
      */
-    private void resize() {
+    final private void resize() {
 	// ToDo: argument with new size
 
 	Object[] oldKV = keyValueTable;
@@ -281,7 +290,7 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
 	int mask = indices.length - 1;
 
 	//
-	int newIndex = findFreeSpot(i);
+	int newIndex = findFreeSpot(i, mask);
 	indices[newIndex] = v;
 	kv[newIndex << 1] = kv[i << 1];
 	kv[(newIndex << 1) + 1] = kv[(i << 1) + 1];
@@ -298,9 +307,8 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
      * @param i
      * @return
      */
-    final private int findFreeSpot(int i) {
+    final private int findFreeSpot(int i, int mask) {
 	Object[] kv = keyValueTable;
-	int mask = indexTable.length - 1;
 
 	//
 	if (i < mask && kv[(i + 1) << 1] == null)
@@ -311,7 +319,8 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
 	//
 	while (true) {
 	    // i = nextProbe(i) & mask;
-	    i = (i * 5 + 1) & mask;
+	    // i = (i * 5 + 1) & mask;
+	    i = ((i << 4) + i + 1) & mask;
 	    if (kv[i << 1] == null)
 		return i;
 	}
