@@ -201,7 +201,7 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
         }
 
         // So, hash chain is not empty but our key was not found => insert
-        int newIndex = findFreeSpot(i, mask);
+        int newIndex = findFreeSpot(i, mask, hc);
         indices[newIndex] = FOREIGN | hcBits | (c0 & mask);
         indices[i0] = (c0 & ~mask) | newIndex;
         kv[newIndex << 1] = key;
@@ -323,7 +323,7 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
         int mask = indices.length - 1;
 
         //
-        int newIndex = findFreeSpot(i, mask);
+        int newIndex = findFreeSpot(i, mask, v);
         indices[newIndex] = v;
         kv[newIndex << 1] = kv[i << 1];
         kv[(newIndex << 1) + 1] = kv[(i << 1) + 1];
@@ -340,7 +340,7 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
      * @param i
      * @return
      */
-    final private int findFreeSpot(int i, int mask) {
+    final private int findFreeSpot(int i, int mask, int perturb) {
         Object[] kv = keyValueTable;
 
         while (true) {
@@ -351,9 +351,10 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
 
             // i = nextProbe(i) & mask;
             // i = (i * 5 + 1) & mask;
-            i = ((i << 4) + i + 1) & mask;
+            i = ((i << 4) + i + 1 + perturb) & mask;
             if (kv[i << 1] == null)
                 return i;
+            perturb >>>= 5;
         }
     }
 
