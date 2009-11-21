@@ -351,7 +351,7 @@ public class FastHashMap2<K, V> implements Cloneable, Serializable, Map<K, V> {
 
             // i = nextProbe(i) & mask;
             // i = (i * 5 + 1) & mask;
-            i = ((i << 4) + i + 1 + perturb) & mask;
+            i = ((i << 2) + i + 1 + perturb) & mask;
             if (kv[i << 1] == null)
                 return i;
             perturb >>>= 5;
